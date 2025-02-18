@@ -83,8 +83,12 @@ const {
   updateRenamedTable,
 } = require("../controllers/tableMetadata/tableMetadata.js");
 
-// Public routes
+const { getTableData } = require('../controllers/tableData/getTableData');
 
+// table data routes
+router.get('/api/tabledata/:tableName',verifyToken, getTableData);
+
+// Public routes
 router.post("/signup", verifyToken, authorize("admin"), createUser);
 
 //opt auth endpoints

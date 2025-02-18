@@ -12,6 +12,7 @@ export const ENDPOINTS = {
     ADMIN: "/admin-notification",
   },
   TABLE: {
+    FETCH_TABLE_DATA: "/api/tableData",
     FETCH_COLUMN_STATUS: "/fetchColumnStatus",
     REQUEST_DATA: "/requestdata",
     FETCH_DROPDOWN_OPTIONS: "/fetchDropdownOptions",

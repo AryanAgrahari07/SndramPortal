@@ -9,6 +9,24 @@ export interface PaginationData {
   pageSize: number;
 }
 
+// Adding a simple cache
+const cache = new Map<
+  string,
+  {
+    data: TableDataResponse;
+    timestamp: number;
+  }
+>();
+
+const CACHE_DURATION = 30000;
+
+export interface FilteredTableDataParams extends FetchTableDataParams {
+  searchQuery?: string;
+  sortColumn?: string | null;
+  sortDirection?: "asc" | "desc";
+  filters?: Record<string, { operator: string; value: string }>;
+}
+
 export interface TableDataResponse {
   success: boolean;
   data: Record<string, unknown>[];
@@ -77,7 +95,7 @@ interface RowData {
 
 export const fetchTableData = async (
   tableName: string,
-  params: FetchTableDataParams
+  params: FilteredTableDataParams
 ): Promise<TableDataResponse> => {
   const token = localStorage.getItem("token");
 
@@ -91,20 +109,52 @@ export const fetchTableData = async (
     };
   }
 
+  // cache key from tableName and params
+  const cacheKey = `${tableName}-${JSON.stringify(params)}`;
+
+  // Check cache
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
   try {
+    const queryParams = new URLSearchParams({
+      page: params.page.toString(),
+      pageSize: params.pageSize.toString(),
+    });
+
+    // Add optional filter parameters
+    if (params.searchQuery) {
+      queryParams.append("searchQuery", params.searchQuery);
+    }
+    if (params.sortColumn) {
+      queryParams.append("sortColumn", params.sortColumn);
+      queryParams.append("sortDirection", params.sortDirection || "asc");
+    }
+    if (params.filters && Object.keys(params.filters).length > 0) {
+      queryParams.append("filters", JSON.stringify(params.filters));
+    }
+
     const response = await fetch(
-      `${API_URL}/tableData/${tableName}?page=${params.page}&pageSize=${params.pageSize}`,
+      `${API_URL}/api/tableData/${tableName}?${queryParams.toString()}`,
       {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: getAuthHeaders(),
       }
     );
 
     const data = await response.json();
+
+    // Cache the result
+    cache.set(cacheKey, {
+      data: {
+        success: true,
+        data: data.data,
+        columns: data.columns,
+        pagination: data.pagination,
+      },
+      timestamp: Date.now(),
+    });
 
     if (!response.ok) {
       return {

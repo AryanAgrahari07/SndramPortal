@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchTableData, PaginationData } from "../services/tableDataService";
+import {
+  fetchTableData,
+  PaginationData,
+  FilteredTableDataParams,
+} from "../services/tableDataService";
 
 interface UseTableDataProps {
   tableName: string;
   pageSize: number;
+  filterParams: {
+    searchQuery: string;
+    sortColumn: string | null;
+    sortDirection: "asc" | "desc";
+    filters: Record<string, { operator: string; value: string }>;
+    currentPage: number;
+  };
 }
 
 export interface UseTableDataReturn {
@@ -19,15 +30,16 @@ export interface UseTableDataReturn {
 export const useTableData = ({
   tableName,
   pageSize,
+  filterParams,
 }: UseTableDataProps): UseTableDataReturn => {
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
-    total: 0,
-    totalPages: 1,
     currentPage: 1,
+    totalPages: 1,
+    total: 0,
     pageSize,
   });
 
@@ -36,10 +48,18 @@ export const useTableData = ({
     setError(null);
 
     try {
-      const response = await fetchTableData(tableName, {
+      const params: FilteredTableDataParams = {
         page: pagination.currentPage,
         pageSize,
-      });
+        ...(filterParams && {
+          searchQuery: filterParams.searchQuery,
+          sortColumn: filterParams.sortColumn,
+          sortDirection: filterParams.sortDirection,
+          filters: filterParams.filters,
+        }),
+      };
+
+      const response = await fetchTableData(tableName, params);
 
       if (response.success) {
         setData(response.data);
@@ -61,7 +81,7 @@ export const useTableData = ({
     } finally {
       setIsLoading(false);
     }
-  }, [tableName, pagination.currentPage, pageSize]);
+  }, [tableName, pagination.currentPage, pageSize, filterParams]);
 
   // Fetch data when dependencies change
   useEffect(() => {
