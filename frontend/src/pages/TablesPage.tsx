@@ -29,15 +29,72 @@ export const TablesPage: React.FC = () => {
   const [tableKey, setTableKey] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(15);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tableMetadata, setTableMetadata] = useState<
-    Record<string, TableMetadata>
-  >({});
+  // const [tableMetadata, setTableMetadata] = useState<
+  //   Record<string, TableMetadata>
+  // >({});
 
   const navigate = useNavigate();
 
+  const loadTableMetadata = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8080/get-renamed-tables", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        const metadataMap = data.data.reduce(
+          (acc: Record<string, TableMetadata>, item: TableMetadata) => {
+            acc[item.original_table_name] = item;
+            return acc;
+          },
+          {}
+        );
+        return metadataMap;
+      }
+      return {};
+    } catch (error) {
+      console.error("Failed to fetch table metadata:", error);
+      throw error;
+    }
+  };
+
+  const loadTables = async (metadata: Record<string, TableMetadata>) => {
+    const response = await fetchTables();
+    if (response.success) {
+      const enhancedTables = response.tables.map((table) => ({
+        ...table,
+        display_name: metadata[table.table_name]?.display_name,
+        description: metadata[table.table_name]?.description,
+      }));
+      return enhancedTables;
+    }
+    throw new Error(response.message || "Failed to fetch tables");
+  };
+
   useEffect(() => {
-    loadTables();
-    loadTableMetadata();
+    const initializeTables = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const metadata = await loadTableMetadata();
+        const enhancedTables = await loadTables(metadata);
+        // setTableMetadata(metadata);
+        setTables(enhancedTables);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "An error occurred while initializing tables"
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeTables();
   }, []);
 
   // Calculate items per page based on container height
@@ -70,58 +127,6 @@ export const TablesPage: React.FC = () => {
     window.addEventListener("resize", calculateItemsPerPage);
     return () => window.removeEventListener("resize", calculateItemsPerPage);
   }, []);
-
-  const loadTableMetadata = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/get-renamed-tables", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) {
-        // Create a map of original_table_name to metadata
-        const metadataMap = data.data.reduce(
-          (acc: Record<string, TableMetadata>, item: TableMetadata) => {
-            acc[item.original_table_name] = item;
-            return acc;
-          },
-          {}
-        );
-        setTableMetadata(metadataMap);
-      }
-    } catch (error) {
-      console.error("Failed to fetch table metadata:", error);
-    }
-  };
-
-  const loadTables = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetchTables();
-      if (response.success) {
-        // Enhance tables with metadata
-        const enhancedTables = response.tables.map((table) => ({
-          ...table,
-          display_name: tableMetadata[table.table_name]?.display_name,
-          description: tableMetadata[table.table_name]?.description,
-        }));
-        setTables(enhancedTables);
-      } else {
-        setError(response.message || "Failed to fetch tables");
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while fetching tables"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
