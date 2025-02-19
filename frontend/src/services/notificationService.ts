@@ -15,6 +15,8 @@ export interface Notification {
   isAdminNotification?: boolean;
   maker?: string;
   pending_count?: number;
+  maker_email?: string;
+  approver_email?: string;
 }
 
 interface AdminNotification {
@@ -45,6 +47,31 @@ const NOTIFICATION_ENDPOINTS = {
 } as const;
 
 export const notificationService = {
+
+  async getUserEmails(userIds: string[]): Promise<Record<string, string>> {
+    const token = localStorage.getItem("token");
+    if (!token || !userIds.length) return {};
+
+    try {
+      const response = await fetch(`${API_URL}/users/emails`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userIds: [...new Set(userIds)] }), // Remove duplicates
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch user emails");
+      const data = await response.json();
+      return data.emails || {};
+    } catch (error) {
+      console.error("Error fetching user emails:", error);
+      return {};
+    }
+  },
+
+
   async fetchNotifications(
     role: "maker" | "checker" | "admin"
   ): Promise<Notification[]> {
@@ -84,12 +111,17 @@ export const notificationService = {
       // Transform checker notifications
       if (role === "checker" && responseData.data) {
         const checkerData = responseData.data as CheckerNotification[];
+
+        const userIds = checkerData.map(n => n.maker).filter(Boolean);
+        const emailMap = await this.getUserEmails(userIds);
+
         return checkerData.map((checkerNotif) => ({
           request_id: `${checkerNotif.table_name}-${checkerNotif.maker}`,
           type: "change",
           table_name: checkerNotif.table_name,
           status: "pending",
           maker: checkerNotif.maker,
+          maker_email: emailMap[checkerNotif.maker],
           updated_at: checkerNotif.created_at,
           pending_count: checkerNotif.pending_count,
           approver: "",
@@ -98,6 +130,10 @@ export const notificationService = {
 
       // Handle admin notifications
       if (role === "admin" && responseData.data) {
+        const adminData = responseData.data as AdminNotification[];
+        const userIds = adminData.map(n => n.maker).filter(Boolean);
+        const emailMap = await this.getUserEmails(userIds);
+
         // Transform admin notifications to match the expected format
         return responseData.data.map((adminNotif) => ({
           id: `${adminNotif.table_name}-${adminNotif.maker}`,
@@ -110,9 +146,26 @@ export const notificationService = {
           comments: `${adminNotif.pending_count} pending changes`,
           isAdminNotification: true,
           maker: adminNotif.maker,
+          maker_email: emailMap[adminNotif.maker],
           pending_count: adminNotif.pending_count,
         }));
       }
+
+        // Handle maker notifications
+        if (responseData.notifications) {
+          const notifications = responseData.notifications;
+          const userIds = [...new Set(
+            notifications.flatMap(n => [n.maker, n.approver]).filter(Boolean)
+          )] as string[];
+          
+          const emailMap = await this.getUserEmails(userIds);
+  
+          return notifications.map(notif => ({
+            ...notif,
+            maker_email: notif.maker ? emailMap[notif.maker] : undefined,
+            approver_email: notif.approver ? emailMap[notif.approver] : undefined,
+          }));
+        }
 
       return responseData.notifications || [];
     } catch (error) {

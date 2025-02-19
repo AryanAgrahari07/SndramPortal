@@ -2,8 +2,7 @@ import React from "react";
 import { Layout } from "../components/Layout";
 import { useNavigate } from "react-router-dom";
 import { DashboardCard } from "../components/DashboardCard";
-import { Database, Users, Shield } from "lucide-react";
-
+import { Database } from "lucide-react";
 const DashboardPage: React.FC = () => {
   const firstName = localStorage.getItem("firstName") || "User";
   const navigate = useNavigate();
@@ -17,20 +16,20 @@ const DashboardPage: React.FC = () => {
       ),
       onClick: () => navigate("/tables"),
     },
-    {
-      title: "User Administration",
-      description: "Manage user roles and permissions",
-      icon: <Users className="w-6 h-6 text-[#2962FF] group-hover:text-white" />,
-      onClick: () => navigate("/users"),
-    },
-    {
-      title: "Secure Operations",
-      description: "Enterprise-grade security for all operations",
-      icon: (
-        <Shield className="w-6 h-6 text-[#2962FF] group-hover:text-white" />
-      ),
-      onClick: () => navigate("/security"),
-    },
+    // {
+    //   title: "User Administration",
+    //   description: "Manage user roles and permissions",
+    //   icon: <Users className="w-6 h-6 text-[#2962FF] group-hover:text-white" />,
+    //   onClick: () => navigate("/users"),
+    // },
+    // {
+    //   title: "Secure Operations",
+    //   description: "Enterprise-grade security for all operations",
+    //   icon: (
+    //     <Shield className="w-6 h-6 text-[#2962FF] group-hover:text-white" />
+    //   ),
+    //   onClick: () => navigate("/security"),
+    // },
   ];
 
   return (

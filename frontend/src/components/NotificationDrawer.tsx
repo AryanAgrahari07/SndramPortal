@@ -198,9 +198,31 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             </h3>
             <p className="text-[#6B7280] text-xs mt-0.5">
               {status === "rejected" ? "Rejector" : "Approver"}:{" "}
-              {notification.approver}
+              {notification.approver_email}
             </p>
           </div>
+
+           {/* Add Comment Section */}
+           {status === "rejected" && notification.comments && (
+            <div className="mt-3 border-l border-red-200 bg-gray-50/80 pl-3 pr-2 py-2 rounded-sm">
+              <div className="flex items-start gap-2.5">
+                <XCircle className="h-3.5 w-3.5 text-red-400/80 mt-1 flex-shrink-0" />
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">
+                      Rejection Comment
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      {new Date(notification.updated_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-[13px] text-gray-600 leading-relaxed">
+                    {notification.comments}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <button
@@ -242,7 +264,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-gray-600">Maker:</span>
               <span className="text-xs font-medium text-gray-800">
-                {notification.maker}
+                {notification.maker_email}
               </span>
             </div>
             <div className="flex items-center justify-between mt-2">

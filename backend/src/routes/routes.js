@@ -84,6 +84,12 @@ const {
 } = require("../controllers/tableMetadata/tableMetadata.js");
 
 const { getTableData } = require('../controllers/tableData/getTableData');
+const { getUserEmails } = require('../controllers/userEmails/getUserEmails.js');
+
+
+
+// users email data 
+router.post('/users/emails', verifyToken, getUserEmails);
 
 // table data routes
 router.get('/api/tabledata/:tableName',verifyToken, getTableData);
