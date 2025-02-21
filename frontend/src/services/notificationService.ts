@@ -17,6 +17,8 @@ export interface Notification {
   pending_count?: number;
   maker_email?: string;
   approver_email?: string;
+  makerseen?: boolean;
+  checkerseen?: boolean;
 }
 
 interface AdminNotification {
@@ -31,6 +33,7 @@ interface CheckerNotification {
   maker: string;
   created_at: string;
   pending_count: number;
+  checkerseen: boolean;
 }
 
 interface NotificationResponse {
@@ -47,6 +50,60 @@ const NOTIFICATION_ENDPOINTS = {
 } as const;
 
 export const notificationService = {
+
+//   async markNotificationsAsSeen(role: "maker" | "checker", requestIds: string[]): Promise<boolean> {
+//     const token = localStorage.getItem("token");
+
+//     if (!token) {
+//         console.error("No authentication token found");
+//         return false;
+//     }
+
+//     try {
+//         const response = await fetch(`${API_URL}/mark-notifications-seen`, {
+//             method: "POST",
+//             headers: {
+//                 Authorization: `Bearer ${token}`,
+//                 "Content-Type": "application/json",
+//             },
+//             body: JSON.stringify({ role , requestIds}),
+//         });
+
+//         if (!response.ok) throw new Error("Failed to mark notifications as seen");
+
+//         return true;
+//     } catch (error) {
+//         console.error("Error marking notifications as seen:", error);
+//         return false;
+//     }
+// },
+
+  async markAllAsRead(role: "maker" | "checker"): Promise<boolean> {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("No authentication token found");
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/mark-notifications-read`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role }),
+      });
+
+      if (!response.ok) throw new Error("Failed to mark notifications as read");
+      
+      return true;
+    } catch (error) {
+      console.error("Error marking notifications as read:", error);
+      return false;
+    }
+  },
 
   async getUserEmails(userIds: string[]): Promise<Record<string, string>> {
     const token = localStorage.getItem("token");
@@ -83,10 +140,13 @@ export const notificationService = {
     }
 
     try {
+
       const endpoint =
         NOTIFICATION_ENDPOINTS[
           role.toUpperCase() as keyof typeof NOTIFICATION_ENDPOINTS
         ];
+
+
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "GET",
         headers: {
@@ -150,7 +210,8 @@ export const notificationService = {
           pending_count: adminNotif.pending_count,
         }));
       }
-
+      
+      console.log("responseData.notifications:", responseData.notifications);
         // Handle maker notifications
         if (responseData.notifications) {
           const notifications = responseData.notifications;
@@ -162,6 +223,7 @@ export const notificationService = {
   
           return notifications.map(notif => ({
             ...notif,
+            // makerseen: notif.makerseen,
             maker_email: notif.maker ? emailMap[notif.maker] : undefined,
             approver_email: notif.approver ? emailMap[notif.approver] : undefined,
           }));

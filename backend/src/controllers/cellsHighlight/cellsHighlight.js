@@ -42,16 +42,29 @@ exports.highlightCells = async (req, res) => {
 
             // Compare old_data and new_data to find changed fields
             for (const key in newData) {
-                if (JSON.stringify(oldData[key]) !== JSON.stringify(newData[key])) {
+                const oldValue = oldData[key];
+                const newValue = newData[key];
+
+                // Skip if both values are empty (null, undefined, or empty string)
+                if (
+                    (oldValue === null || oldValue === undefined || oldValue === '') &&
+                    (newValue === null || newValue === undefined || newValue === '')
+                ) {
+                    continue;
+                }
+
+                if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
                     changesMap[rowId].changed_fields.add(key);
                 }
             }
         });
 
         // Convert the map to array and convert Sets to arrays
-        const changes = Object.values(changesMap).map(change => ({
-            ...change,
-            changed_fields: Array.from(change.changed_fields)
+        const changes = Object.values(changesMap)
+            .filter(change => change.changed_fields.size > 0)
+            .map(change => ({
+                ...change,
+                changed_fields: Array.from(change.changed_fields)
         }));
 
         return res.status(200).json({

@@ -83,6 +83,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     return notifications.filter((n) => n.status.toLowerCase() === activeTab);
   }, [notifications, activeTab]);
 
+
   const getNotificationCounts = () => {
     const approved = notifications.filter(
       (n) => n.status.toLowerCase() === "approved"
@@ -96,6 +97,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       rejected,
     };
   };
+
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -131,33 +133,62 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     oldData: Record<string, unknown>,
     newData: Record<string, unknown>
   ) => {
+
+     // Getting only the changed fields
+     const changedFields = Object.keys(newData).filter(key => {
+      // Skip if both values are empty/null/undefined
+      if (
+        (oldData[key] === null || oldData[key] === undefined || oldData[key] === '') &&
+        (newData[key] === null || newData[key] === undefined || newData[key] === '')
+      ) {
+        return false;
+      }
+      
+      // Skip if values are the same
+      if (JSON.stringify(oldData[key]) === JSON.stringify(newData[key])) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (changedFields.length === 0) return null;
+
     return (
       <div className="mt-3 border-t pt-2">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="text-xs font-medium text-gray-500 mb-2">
-              Previous Value
-            </h4>
-            {Object.entries(oldData).map(([key, value]) => (
-              <div key={key} className="mb-2">
-                <span className="text-xs text-gray-600 block">{key}:</span>
-                <span className="text-sm text-gray-900">{String(value)}</span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <h4 className="text-xs font-medium text-gray-500 mb-2">
-              New Value
-            </h4>
-            {Object.entries(newData).map(([key, value]) => (
-              <div key={key} className="mb-2">
-                <span className="text-xs text-gray-600 block">{key}:</span>
-                <span className="text-sm text-gray-900">{String(value)}</span>
-              </div>
-            ))}
-          </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-xs font-medium text-gray-500 mb-2">
+            Previous Value
+          </h4>
+          {changedFields.map(key => (
+            <div key={key} className="mb-2">
+              <span className="text-xs text-gray-600 block">{key}:</span>
+              <span className="text-sm text-gray-900">
+                {oldData[key] === null || oldData[key] === undefined 
+                  ? '-'
+                  : String(oldData[key])}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div>
+          <h4 className="text-xs font-medium text-gray-500 mb-2">
+            New Value
+          </h4>
+          {changedFields.map(key => (
+            <div key={key} className="mb-2">
+              <span className="text-xs text-gray-600 block">{key}:</span>
+              <span className="text-sm text-gray-900">
+                {newData[key] === null || newData[key] === undefined 
+                  ? '-'
+                  : String(newData[key])}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
+    </div>
     );
   };
 

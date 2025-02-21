@@ -2,7 +2,7 @@ const { client_update } = require('../../configuration/database/databaseUpdate.j
 
 exports.fetchColumnDropDown = async (req, res) => {
     try {
-        const { table_name, columnName } = req.body;
+        const { table_name, columnName , existingValue} = req.body;
 
         if (!table_name || !columnName) {
             return res.status(400).json({
@@ -36,9 +36,15 @@ exports.fetchColumnDropDown = async (req, res) => {
             });
         }
 
+         // If there's an existing value and it's not in the options, add it
+         if (existingValue && !columnData.options.includes(existingValue)) {
+            columnData.options = [existingValue, ...columnData.options];
+        }
+
         res.status(200).json({
             success: true,
             data: columnData.options,
+            selectedValue: existingValue || null 
         });
     } catch (error) {
         console.error('Error:', error);

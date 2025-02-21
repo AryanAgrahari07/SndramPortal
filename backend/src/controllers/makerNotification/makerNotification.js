@@ -14,7 +14,9 @@ exports.getMakerNotification = async (req, res) => {
                 old_data,
                 new_data,
                 comments,
-                request_id
+                request_id,
+                makerseen,
+                checkerseen
             FROM app.change_tracker 
             WHERE maker = $1 
             AND status IN ('approved', 'rejected')
@@ -53,7 +55,9 @@ exports.getMakerNotification = async (req, res) => {
             old_data: notification.old_data,
             new_data: notification.new_data,
             comments: notification.comments,
-            request_id: notification.request_id
+            request_id: notification.request_id,
+            makerseen: notification.makerseen,
+            checkerseen: notification.checkerseen
         }));
 
         // Process add row notifications
@@ -65,9 +69,13 @@ exports.getMakerNotification = async (req, res) => {
             updated_at: notification.updated_at,
             data: notification.data,
             comments: notification.comments,
-            request_id: notification.request_id
+            request_id: notification.request_id,
+            makerseen: notification.makerseen,
+            checkerseen: notification.checkerseen
         }));
 
+        console.log("changeTrackerNotifications:", changeTrackerNotifications);
+        console.log("addRowNotifications:", addRowNotifications);
         // Combine and sort notifications by updated_at
         const allNotifications = [...changeTrackerNotifications, ...addRowNotifications]
             .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));

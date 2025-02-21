@@ -127,20 +127,28 @@ export const Overview = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
-          <Button
-            variant={selectedView === "ungroup" ? "default" : "outline"}
-            onClick={() => setSelectedView("ungroup")}
-            className={selectedView === "ungroup" ? "bg-[#1A237E]" : ""}
-          >
-            Ungroup
-          </Button>
-          <Button
-            variant={selectedView === "group" ? "default" : "outline"}
-            onClick={() => setSelectedView("group")}
-            className={selectedView === "group" ? "bg-[#1A237E]" : ""}
-          >
-            Group
-          </Button>
+            <Button
+                variant={selectedView === "ungroup" ? "default" : "outline"}
+                onClick={() => setSelectedView("ungroup")}
+                className={`transition-colors duration-200 ${
+                  selectedView === "ungroup"
+                    ? "bg-[#1A237E] hover:bg-[#283593] text-white"
+                    : "text-[#1A237E] border-[#1A237E] hover:bg-[#E8EAF6]"
+                }`}
+                >
+             Ungroup
+            </Button>
+            <Button
+                variant={selectedView === "group" ? "default" : "outline"}
+                onClick={() => setSelectedView("group")}
+                className={`transition-colors duration-200 ${
+                  selectedView === "group"
+                    ? "bg-[#1A237E] hover:bg-[#283593] text-white"
+                    : "text-[#1A237E] border-[#1A237E] hover:bg-[#E8EAF6]"
+                }`}
+                >
+              Group
+           </Button>
         </div>
         <div className="text-sm">
           Pending reviews :{" "}

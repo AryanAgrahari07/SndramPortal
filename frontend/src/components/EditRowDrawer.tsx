@@ -94,9 +94,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
   if (!isOpen) return null;
 
-  // Get only editable columns
-  const editableColumns = columns.filter((column) => isColumnEditable(column));
-
   return (
     <div className="fixed inset-0 overflow-hidden z-50">
       <div className="absolute inset-0 overflow-hidden">
@@ -131,7 +128,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
               {/* Form */}
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="px-4 py-6 space-y-6 sm:px-6">
-                  {editableColumns.map((column) => {
+                  {columns.map((column) => {
                     // Convert column names to a consistent format for comparison
                     const normalizedColumn = column
                       .toLowerCase()
@@ -141,6 +138,11 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         dc.columnName.toLowerCase().replace(/_/g, "") ===
                         normalizedColumn
                     );
+
+                    const isEditable = isColumnEditable(column);
+                    const existingValue = row?.[column]
+                      ? String(row[column])
+                      : "";
 
                     console.log(
                       "Column:",
@@ -159,16 +161,32 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         >
                           {column.split("_").join(" ")}
                         </label>
-                        {dropdownConfig ? (
+                        {dropdownConfig && isEditable ? (
                           <DynamicDropdown
-                            value={String(formData[column] || "")}
+                            value={
+                              formData[column] !== undefined
+                                ? String(formData[column])
+                                : existingValue
+                            }
                             onChange={(value) => handleChange(column, value)}
                             placeholder="Select a value"
                             className="mt-1"
-                            options={dropdownConfig.options.map((opt) => ({
-                              value: opt,
-                              label: opt,
-                            }))}
+                            options={[
+                              // Include existing value at the top if it exists and isn't in options
+                              ...(existingValue &&
+                              !dropdownConfig.options.includes(existingValue)
+                                ? [
+                                    {
+                                      value: existingValue,
+                                      label: existingValue,
+                                    },
+                                  ]
+                                : []),
+                              ...dropdownConfig.options.map((opt) => ({
+                                value: opt,
+                                label: opt,
+                              })),
+                            ]}
                             disabled={isLoading}
                           />
                         ) : (
@@ -176,12 +194,16 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                             type="text"
                             name={column}
                             id={column}
-                            value={String(formData[column] || "")}
+                            value={String(
+                              isEditable
+                                ? formData[column] || ""
+                                : row?.[column] || ""
+                            )}
                             onChange={(e) =>
                               handleChange(column, e.target.value)
                             }
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            disabled={isLoading}
+                            disabled={!isEditable || isLoading} // Disable if not editable
                           />
                         )}
                       </div>

@@ -44,6 +44,7 @@ interface ChangeRequest {
   comments: string | null;
   table_id: string;
   row_id: string;
+  maker_email?: string;
 }
 
 interface ApiResponse {
@@ -68,6 +69,32 @@ export const TableRequests = () => {
   const [selectedChange, setSelectedChange] = useState<ChangeRequest | null>(
     null
   );
+  
+
+  const fetchUserEmails = async (userIds: string[]): Promise<Record<string, string>> => {
+    if (userIds.length === 0) return {};
+    try {
+        const response = await fetch(`${API_URL}/users/emails`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userIds }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || "Failed to fetch user emails");
+        }
+
+        return data.emails || {};
+    } catch (error) {
+        console.error("Error fetching user emails:", error);
+        return {};
+    }
+};
 
   // Fetch requests
   const fetchRequests = useCallback(async () => {
@@ -86,10 +113,21 @@ export const TableRequests = () => {
       if (data.success) {
         // Filter requests for current table
         const tableRequests = data.data.filter(
-          (req) => req.table_name === tableName && req.status === "pending"
+            (req) => req.table_name === tableName && req.status === "pending"
         );
-        setRequests(tableRequests);
-      }
+
+        // Fetch emails for makers
+        const makerIds = Array.from(new Set(tableRequests.map((req) => req.maker)));
+        const emailMap = await fetchUserEmails(makerIds as string[]);
+
+        // Add emails to requests
+        const requestsWithEmails = tableRequests.map((request) => ({
+            ...request,
+            maker_email: emailMap[request.maker] || request.maker,
+        }));
+
+        setRequests(requestsWithEmails);
+    }
     } catch (error) {
       console.log(error);
       toast({
@@ -429,7 +467,7 @@ export const TableRequests = () => {
                       >
                         <XCircle className="h-4 w-4" />
                       </button>
-                      <button
+                      {/* <button
                         onClick={() => {
                           setSelectedChange(request);
                           setShowChangesDialog(true);
@@ -437,12 +475,12 @@ export const TableRequests = () => {
                         className="p-1.5 rounded-full text-blue-500 hover:bg-blue-50"
                       >
                         <Eye className="h-4 w-4" />
-                      </button>
+                      </button> */}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">{index + 1}</TableCell>
                   <TableCell className="font-mono text-sm">
-                    {request.maker}
+                    {request.maker_email}
                   </TableCell>
                   <TableCell>
                     {format(
@@ -455,23 +493,36 @@ export const TableRequests = () => {
 
                   {/* Add dynamic columns */}
                   {getRelevantColumns(requests).map((column) => {
-                    const hasChanged =
-                      request.old_data[column] !== request.new_data[column];
+
+                    const oldValue = request.old_data[column];
+                    const newValue = request.new_data[column];
+
+                    console.log(`Comparing column: ${column}`);
+                    console.log(`Old Value: ${oldValue}, New Value: ${newValue}`);
+
+                    
+                    const hasChanged = (oldValue !== newValue) && 
+                                      !(oldValue === null && newValue === null) && 
+                                      !(oldValue === "" && newValue === "") && 
+                                      !(oldValue === "" && newValue === null) && 
+                                      !(oldValue === null && newValue === "" ) && 
+                                      !(oldValue === undefined && newValue === undefined);
+
                     return (
                       <TableCell key={column}>
                         {hasChanged ? (
                           <div className="flex items-center gap-2">
                             <span className="line-through text-red-500">
-                              {request.old_data[column]?.toString() || "null"}
+                                 {oldValue?.toString() || "null"}
                             </span>
                             <span className="text-gray-400">→</span>
                             <span className="text-green-600">
-                              {request.new_data[column]?.toString() || "null"}
+                                 {newValue?.toString() || "null"}
                             </span>
                           </div>
                         ) : (
                           <span className="text-gray-600">
-                            {request.new_data[column]?.toString() || "null"}
+                                 {newValue?.toString() || "null"}
                           </span>
                         )}
                       </TableCell>

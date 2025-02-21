@@ -4,11 +4,24 @@ import { Layout } from "../components/Layout";
 import { DynamicTable } from "../components/DynamicTable";
 import { fetchTables } from "../services/tableService";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { EXCLUDED_TABLES } from "../config/tableConfig";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Table {
   table_name: string;
   display_name?: string;
   description?: string | null;
+}
+
+interface GroupTable {
+  group_name: string;
+  table_list: string[];
 }
 
 interface TableMetadata {
@@ -29,9 +42,37 @@ export const TablesPage: React.FC = () => {
   const [tableKey, setTableKey] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(15);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [groups, setGroups] = useState<GroupTable[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>("all");
   // const [tableMetadata, setTableMetadata] = useState<
   //   Record<string, TableMetadata>
   // >({});
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/getgrouplist", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && Array.isArray(data.data)) {
+        setGroups(data.data);
+      } else {
+        console.error("Invalid groups data:", data);
+        setGroups([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch groups:", error);
+      setGroups([]);
+    }
+  };
 
   const navigate = useNavigate();
 
@@ -64,11 +105,13 @@ export const TablesPage: React.FC = () => {
   const loadTables = async (metadata: Record<string, TableMetadata>) => {
     const response = await fetchTables();
     if (response.success) {
-      const enhancedTables = response.tables.map((table) => ({
-        ...table,
-        display_name: metadata[table.table_name]?.display_name,
-        description: metadata[table.table_name]?.description,
-      }));
+      const enhancedTables = response.tables
+        .filter((table) => !EXCLUDED_TABLES.includes(table.table_name))
+        .map((table) => ({
+          ...table,
+          display_name: metadata[table.table_name]?.display_name,
+          description: metadata[table.table_name]?.description,
+        }));
       return enhancedTables;
     }
     throw new Error(response.message || "Failed to fetch tables");
@@ -141,10 +184,26 @@ export const TablesPage: React.FC = () => {
   const filteredTables = tables.filter((table) => {
     const searchLower = searchQuery.toLowerCase();
     const tableName = table.table_name.toLowerCase();
-    const displayName = table.display_name?.toLowerCase() || "";
-    return tableName.includes(searchLower) || displayName.includes(searchLower);
+
+    // First check if table matches search query
+    const matchesSearch = tableName.includes(searchLower);
+
+    // If "all" is selected, only apply search filter
+    if (selectedGroup === "all") {
+      return matchesSearch;
+    }
+
+    // Find the selected group's table list
+    const selectedGroupData = groups.find(
+      (g) => g.group_name === selectedGroup
+    );
+    const groupTableList = selectedGroupData?.table_list || [];
+
+    // Check if table is in the selected group's table list
+    return matchesSearch && groupTableList.includes(table.table_name);
   });
 
+  // Calculate pagination
   const totalPages = Math.ceil(filteredTables.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const displayedTables = filteredTables.slice(
@@ -162,32 +221,99 @@ export const TablesPage: React.FC = () => {
     );
   }
 
+  // Function to handle back navigation
+  const handleBack = () => {
+    if (selectedTable) {
+      setSelectedTable(null);
+    } else if (selectedGroup !== "all") {
+      setSelectedGroup("all");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
+  // Breadcrumb component
+  const renderBreadcrumb = () => {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleBack}
+          className="text-[#1a237e] hover:text-[#283593] flex items-center transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          {selectedTable ? "Back" : "Home"}
+        </button>
+        <span className="text-gray-400">/</span>
+        {selectedTable ? (
+          <>
+            <button
+              onClick={() => setSelectedTable(null)}
+              className="text-[#1a237e] hover:text-[#283593]"
+            >
+              Data Management
+            </button>
+            {selectedGroup !== "all" && (
+              <>
+                <span className="text-gray-400">/</span>
+                <button
+                  onClick={() => setSelectedTable(null)}
+                  className="text-[#1a237e] hover:text-[#283593]"
+                >
+                  {selectedGroup}
+                </button>
+              </>
+            )}
+            <span className="text-gray-400">/</span>
+            <span className="text-[#00bfa5]">{selectedTable}</span>
+          </>
+        ) : (
+          <>
+            <span className="text-[#00bfa5]">Data Management</span>
+            {selectedGroup !== "all" && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="text-[#00bfa5]">{selectedGroup}</span>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Layout>
       <div className="h-full flex flex-col">
         {/* Breadcrumb and Search - Hidden when table is selected */}
         {!selectedTable && (
           <div className="flex items-center justify-between h-12 mb-4 px-6">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="text-[#1a237e] hover:text-[#283593] flex items-center transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Home
-              </button>
-              <span className="text-gray-400">/</span>
-              <span className="text-[#00bfa5]">Data Management</span>
-            </div>
+            {renderBreadcrumb()}
 
-            <div className="relative w-[300px]">
-              <input
-                type="text"
-                placeholder="Search table here..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="w-full px-4 py-2 bg-white rounded-lg border border-[#e3f2fd] focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-transparent transition-all"
-              />
+            <div className="flex items-center gap-4">
+              {/* Group Dropdown */}
+              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                <SelectTrigger className="w-[180px] bg-white">
+                  <SelectValue placeholder="Select Group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Groups</SelectItem>
+                  {groups.map((group) => (
+                    <SelectItem key={group.group_name} value={group.group_name}>
+                      {group.group_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="relative w-[300px]">
+                <input
+                  type="text"
+                  placeholder="Search table here..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="w-full px-4 py-2 bg-white rounded-lg border border-[#e3f2fd] focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-transparent transition-all"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -221,30 +347,40 @@ export const TablesPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0 px-6">
-            <div
-              ref={containerRef}
-              className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-min content-start"
-            >
-              {displayedTables.map((table) => (
-                <button
-                  key={table.table_name}
-                  onClick={() => setSelectedTable(table.table_name)}
-                  className="flex flex-col p-4 bg-white rounded-lg border border-[#e3f2fd] hover:border-[#00bfa5] hover:shadow-lg transition-all text-left min-h-[60px] group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#1a237e] font-medium group-hover:text-[#283593]">
-                      {table.display_name || table.table_name}
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-[#00bfa5] group-hover:translate-x-1 transition-transform" />
-                  </div>
-                  {table.description && (
-                    <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                      {table.description}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
+            {displayedTables.length === 0 ? (
+              <div className="flex justify-center items-center h-40">
+                <p className="text-gray-500 text-lg">
+                  {selectedGroup === "all"
+                    ? "No tables found matching your search"
+                    : `No tables found in group "${selectedGroup}"`}
+                </p>
+              </div>
+            ) : (
+              <div
+                ref={containerRef}
+                className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-min content-start"
+              >
+                {displayedTables.map((table) => (
+                  <button
+                    key={table.table_name}
+                    onClick={() => setSelectedTable(table.table_name)}
+                    className="flex flex-col p-4 bg-white rounded-lg border border-[#e3f2fd] hover:border-[#00bfa5] hover:shadow-lg transition-all text-left min-h-[60px] group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#1a237e] font-medium group-hover:text-[#283593]">
+                        {table.display_name || table.table_name}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-[#00bfa5] group-hover:translate-x-1 transition-transform" />
+                    </div>
+                    {selectedGroup !== "all" && (
+                      <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                        {selectedGroup}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-4 mt-4 py-2">

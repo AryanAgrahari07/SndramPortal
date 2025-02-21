@@ -85,8 +85,9 @@ const {
 
 const { getTableData } = require('../controllers/tableData/getTableData');
 const { getUserEmails } = require('../controllers/userEmails/getUserEmails.js');
+// const { markNotificationsAsSeen } = require('../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js');
 
-
+// router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
 // users email data 
 router.post('/users/emails', verifyToken, getUserEmails);

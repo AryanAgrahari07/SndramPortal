@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { NotificationDrawer } from "./NotificationDrawer";
 import { ChevronDown, Bell } from "lucide-react";
 import logo from "../assets/images/Logo-Full.svg";
-
+    
 export const Header: React.FC = () => {
   const [showLogout, setShowLogout] = useState(false);
   const [userData, setUserData] = useState({
@@ -12,6 +12,7 @@ export const Header: React.FC = () => {
     email: "",
   });
   const [isOpen, setIsOpen] = useState(false);
+
 
   useEffect(() => {
     // Get user data from localStorage

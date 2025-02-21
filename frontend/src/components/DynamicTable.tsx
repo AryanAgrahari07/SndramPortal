@@ -95,7 +95,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     error: permissionsError,
   } = useColumnPermissions(tableName);
 
-  
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
   };
@@ -126,14 +125,12 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     );
   };
 
-
   const applyFilter = (column: string, operator: string, value: string) => {
     setTempFilters((prev) => ({
       ...prev,
       [column]: { operator, value },
     }));
   };
-
 
   // Add apply filter handler
   const handleApplyFilter = (column: string) => {
@@ -147,7 +144,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     }));
     setActiveFilterColumn(null);
   };
-
 
   // sort handling
   const handleSort = useCallback((column: string) => {
@@ -167,19 +163,18 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         return {
           ...prev,
           sortDirection: "desc",
-          currentPage: 1
+          currentPage: 1,
         };
       } else {
         return {
           ...prev,
           sortColumn: null,
           sortDirection: "asc", // Reset to default
-          currentPage: 1
+          currentPage: 1,
         };
       }
     });
   }, []);
-
 
   // filter click handler
   const handleFilterClick = useCallback(
@@ -189,7 +184,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     },
     [activeFilterColumn]
   );
-
 
   const clearFilter = useCallback((column: string) => {
     setFilterParams((prev) => {
@@ -204,7 +198,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     setActiveFilterColumn(null);
   }, []);
 
-
   // page change handler
   const handlePageChange = useCallback(
     (page: number) => {
@@ -216,7 +209,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     },
     [setCurrentPage]
   );
-
 
   // page size change handler
   const handlePageSizeChange = useCallback(
@@ -230,17 +222,14 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     [onPageSizeChange]
   );
 
-
   useEffect(() => {
     console.log("FilterParams updated:", filterParams);
   }, [filterParams]);
-
 
   // Fetching dropdown columns when table name changes
   useEffect(() => {
     fetchDropdownData();
   }, [tableName]);
-
 
   useEffect(() => {
     if (tableName) {
@@ -249,8 +238,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         .catch(console.error);
     }
   }, [tableName]);
-
-
 
   const fetchDropdownData = async () => {
     try {
@@ -464,40 +451,43 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
                         <div
                           className={` flex flex-col gap-0 ml-1.5 
                             ${
-                              filterParams.sortColumn === column || filterParams.sortDirection === null
+                              filterParams.sortColumn === column ||
+                              filterParams.sortDirection === null
                                 ? "opacity-100"
                                 : "opacity-0 group-hover:opacity-100"
-                             } transition-opacity
+                            } transition-opacity
                           `}
                         >
-
-                        <div className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                          <div
+                            className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
                               ${
-                                filterParams.sortColumn === column && filterParams.sortDirection === "asc"
+                                filterParams.sortColumn === column &&
+                                filterParams.sortDirection === "asc"
                                   ? "bg-[#00bfa5] p-0.5" // Active ascending background
                                   : ""
                               }`}
-                         >
-                              <ChevronUp
-                                    className={`h-2.5 w-2.5 ${
-                                      filterParams.sortColumn === column &&
-                                      filterParams.sortDirection === "asc"
-                                        ? "text-white stroke-[2.5]" // Active ascending icon
-                                        : filterParams.sortDirection === null
-                                        ? "text-gray-400 group-hover:text-[#00bfa5]"
-                                        : "text-gray-400 group-hover:text-[#00bfa5]/70"
-                                    }`}
-                              />
-                       </div>
+                          >
+                            <ChevronUp
+                              className={`h-2.5 w-2.5 ${
+                                filterParams.sortColumn === column &&
+                                filterParams.sortDirection === "asc"
+                                  ? "text-white stroke-[2.5]" // Active ascending icon
+                                  : filterParams.sortDirection === null
+                                  ? "text-gray-400 group-hover:text-[#00bfa5]"
+                                  : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                              }`}
+                            />
+                          </div>
 
-                       <div className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                          <div
+                            className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
                               ${
                                 filterParams.sortColumn === column &&
                                 filterParams.sortDirection === "desc"
                                   ? "bg-[#00bfa5] p-0.5" // Active descending background
                                   : ""
                               }`}
-                        >
+                          >
                             <ChevronDown
                               className={`h-2.5 w-2.5 ${
                                 filterParams.sortColumn === column &&
@@ -508,9 +498,9 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
                                   : "text-gray-400 group-hover:text-[#00bfa5]/70"
                               }`}
                             />
-                         </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
                       {/* Filter icon */}
                       <button

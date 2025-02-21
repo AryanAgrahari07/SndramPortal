@@ -10,6 +10,8 @@ export const ENDPOINTS = {
     MAKER: "/maker-notification",
     CHECKER: "/checker-notification",
     ADMIN: "/admin-notification",
+    // UNREAD_COUNT: "/notifications/unread-count",
+    // MARK_READ: "/notifications/mark-read",
   },
   TABLE: {
     FETCH_TABLE_DATA: "/api/tableData",
