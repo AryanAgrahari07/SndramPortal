@@ -372,6 +372,11 @@ export const TablesPage: React.FC = () => {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#00bfa5] group-hover:translate-x-1 transition-transform" />
                     </div>
+                     {table.description && (
+                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                              {table.description}
+                            </p>
+                      )}
                     {selectedGroup !== "all" && (
                       <p className="text-sm text-gray-600 mt-2 line-clamp-2">
                         {selectedGroup}
