@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Edit2, Eye, EyeOff, Ban, X } from "lucide-react";
+import { Edit2, Eye, Ban, X, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,6 @@ const INITIAL_USER_STATE: User = {
   firstName: "",
   lastName: "",
   email: "",
-  password: "",
   role: "maker",
 };
 
@@ -44,13 +43,15 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState<User>(INITIAL_USER_STATE);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  // const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogState, setDialogState] = useState<DialogState>({
     disable: { open: false, user: null },
     edit: { open: false },
     create: { open: false },
   });
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Add pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,9 +64,9 @@ const UserManagement: React.FC = () => {
   const paginatedUsers = users.slice(startIndex, endIndex);
 
   // Load users from backend
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (query: string) => {
     try {
-      const response = await getAllUsers();
+      const response = await getAllUsers(query);
       if (response.success) {
         const transformedUsers = response.data.map((user: UserApiResponse) => ({
           id: user.user_id,
@@ -89,29 +90,31 @@ const UserManagement: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
-    loadUsers();
+    loadUsers(searchQuery);
   }, [loadUsers]);
 
+
+  const handleSearch = () => {
+    loadUsers(searchQuery); // Fetch users based on search query
+  };
+
+  const handleclear = () => {
+    setSearchQuery("");
+    loadUsers(""); // Fetch users based on search query
+  };
+
   // Form validation
-  const validateForm = useCallback(
-    (user: User, isEdit = false): Record<string, string> => {
-      const errors: Record<string, string> = {};
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validateForm = useCallback((user: User): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      if (!user.firstName?.trim()) errors.firstName = "First name is required";
-      if (!user.lastName?.trim()) errors.lastName = "Last name is required";
-      if (!user.email?.trim()) errors.email = "Email is required";
-      if (!emailRegex.test(user.email)) errors.email = "Invalid email format";
+    if (!user.firstName?.trim()) errors.firstName = "First name is required";
+    if (!user.lastName?.trim()) errors.lastName = "Last name is required";
+    if (!user.email?.trim()) errors.email = "Email is required";
+    if (!emailRegex.test(user.email)) errors.email = "Invalid email format";
 
-      if (!isEdit && !user.password) {
-        errors.password = "Password is required";
-      } else if (user.password && user.password.length < 8) {
-        errors.password = "Password must be at least 8 characters";
-      }
-      return errors;
-    },
-    []
-  );
+    return errors;
+  }, []);
 
   // Handle user disable/enable
   const handleToggleUserActive = async (user: User) => {
@@ -145,7 +148,7 @@ const UserManagement: React.FC = () => {
           );
         }
         // Reload users to ensure we're in sync with the database
-        loadUsers();
+        loadUsers(searchQuery);
       }
     } catch (error) {
       console.error(error);
@@ -158,7 +161,7 @@ const UserManagement: React.FC = () => {
         className: "bg-[#003087] text-white border-none",
       });
       // Refresh users list to ensure UI is in sync with database
-      loadUsers();
+      loadUsers(searchQuery);
     } finally {
       setDialogState((prev) => ({
         ...prev,
@@ -217,12 +220,13 @@ const UserManagement: React.FC = () => {
         if (response.success) {
           setNewUser(INITIAL_USER_STATE);
           setErrors({});
-          loadUsers();
+          loadUsers(searchQuery);
           toast({
             title: "Success",
             description: "User created successfully",
             className: "bg-[#003087] text-white border-none",
           });
+          setDialogOpen(false);
         }
       } catch (error) {
         const errorMessage =
@@ -253,7 +257,7 @@ const UserManagement: React.FC = () => {
   const handleUpdateUser = useCallback(async () => {
     if (!editingUser?.id) return;
 
-    const validationErrors = validateForm(editingUser, true);
+    const validationErrors = validateForm(editingUser);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -271,14 +275,14 @@ const UserManagement: React.FC = () => {
         firstName: editingUser.firstName,
         lastName: editingUser.lastName,
         role: editingUser.role,
-        password: editingUser.password, // Only included if changed
+        // password: editingUser.password, // Only included if changed
       });
 
       if (response.success) {
         setDialogState((prev) => ({ ...prev, edit: { open: false } }));
         setEditingUser(null);
         setErrors({});
-        loadUsers();
+        loadUsers(searchQuery);
         toast({
           title: "Success",
           description: "User updated successfully",
@@ -302,10 +306,40 @@ const UserManagement: React.FC = () => {
         <h1 className="text-2xl font-semibold text-gray-900">
           User Management
         </h1>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center ">
+        {/* Search Input */}
+           <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={searchQuery}
+                placeholder="Search by name or email..."
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+           </div>
+
+            <div className="flex space-x-2">
+                <Button
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-400 transition-colors"
+                  onClick={handleclear}
+                >
+                  Clear
+                </Button>
+                <Button
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors"
+                  onClick={handleSearch}
+                >
+                  Search
+                </Button>
+            </div>
+        </div>
+
         <Button
-          onClick={() =>
-            setDialogState((prev) => ({ ...prev, create: { open: true } }))
-          }
+          onClick={() => {
+            setDialogState((prev) => ({ ...prev, create: { open: true } }));
+            setDialogOpen(true);
+          }}
           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-md"
         >
           + Create New User
@@ -403,8 +437,15 @@ const UserManagement: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+
               </tbody>
             </table>
+
+                {paginatedUsers.length === 0 && (
+                      <div className="flex justify-center items-center h-32">
+                      <p className="text-gray-500 text-lg font-semibold">No users found</p>
+                      </div>
+                )}
           </div>
 
           <div className="px-6 py-4 bg-white border-t border-gray-200">
@@ -418,116 +459,94 @@ const UserManagement: React.FC = () => {
       </Card>
 
       {/* Create User Dialog */}
-      <Dialog
-        open={dialogState.create?.open}
-        onOpenChange={(open) =>
-          setDialogState((prev) => ({ ...prev, create: { open } }))
-        }
-      >
-        <DialogContent className="sm:max-w-[500px] p-4 relative">
-          <button
-            onClick={() =>
-              setDialogState((prev) => ({ ...prev, create: { open: false } }))
-            }
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
-              Create New User
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the user details below. All fields are required.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateUser} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-poppins">
-              {renderFormInput(
-                "firstName",
-                "First Name",
-                "text",
-                newUser.firstName,
-                (e) =>
-                  setNewUser((prev) => ({ ...prev, firstName: e.target.value }))
-              )}
-              {renderFormInput(
-                "lastName",
-                "Last Name",
-                "text",
-                newUser.lastName,
-                (e) =>
-                  setNewUser((prev) => ({ ...prev, lastName: e.target.value }))
-              )}
-              {renderFormInput("email", "Email", "email", newUser.email, (e) =>
-                setNewUser((prev) => ({ ...prev, email: e.target.value }))
-              )}
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={newUser.password}
-                  onChange={(e) =>
+      {dialogOpen && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-[500px] p-4 relative">
+            <button
+              onClick={() => {
+                setDialogState((prev) => ({
+                  ...prev,
+                  create: { open: false },
+                }));
+                setDialogOpen(false);
+              }}
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">
+                Create New User
+              </DialogTitle>
+              <DialogDescription>
+                Fill in the user details below. All fields are required.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-poppins">
+                {renderFormInput(
+                  "firstName",
+                  "First Name",
+                  "text",
+                  newUser.firstName,
+                  (e) =>
                     setNewUser((prev) => ({
                       ...prev,
-                      password: e.target.value,
+                      firstName: e.target.value,
                     }))
-                  }
-                  className={errors.password ? "border-red-500" : ""}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-500" />
-                  )}
-                </button>
-                {errors.password && (
-                  <p className="text-red-500 text-sm mt-1">{errors.password}</p>
                 )}
+                {renderFormInput(
+                  "lastName",
+                  "Last Name",
+                  "text",
+                  newUser.lastName,
+                  (e) =>
+                    setNewUser((prev) => ({
+                      ...prev,
+                      lastName: e.target.value,
+                    }))
+                )}
+                {renderFormInput(
+                  "email",
+                  "Email",
+                  "email",
+                  newUser.email,
+                  (e) =>
+                    setNewUser((prev) => ({ ...prev, email: e.target.value }))
+                )}
+
+                <div className="space-y-2">
+                  <Select
+                    value={newUser.role}
+                    onValueChange={(value: "maker" | "checker") =>
+                      setNewUser((prev) => ({ ...prev, role: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maker">Maker</SelectItem>
+                      <SelectItem value="checker">Checker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Select
-                  value={newUser.role}
-                  onValueChange={(value: "maker" | "checker") =>
-                    setNewUser((prev) => ({ ...prev, role: value }))
-                  }
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="maker">Maker</SelectItem>
-                    <SelectItem value="checker">Checker</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDialogState((prev) => ({
-                    ...prev,
-                    create: { open: false },
-                  }));
-                  setNewUser(INITIAL_USER_STATE);
-                  setErrors({});
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Create User</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                  Cancel
+                </Button>
+                <Button type="submit">Create User</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Edit User Dialog */}
       <Dialog
@@ -603,11 +622,7 @@ const UserManagement: React.FC = () => {
                   id="edit-email"
                   type="email"
                   value={editingUser?.email || ""}
-                  onChange={(e) =>
-                    setEditingUser((prev) =>
-                      prev ? { ...prev, email: e.target.value } : null
-                    )
-                  }
+                  readOnly
                   className={`${
                     errors.email ? "border-red-500" : ""
                   } font-poppins`}
@@ -638,36 +653,6 @@ const UserManagement: React.FC = () => {
                     <SelectItem value="checker">Checker</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2 col-span-2">
-                <label htmlFor="edit-password" className="font-poppins">
-                  Password (leave blank to keep unchanged)
-                </label>
-                <div className="relative">
-                  <Input
-                    id="edit-password"
-                    type={showPassword ? "text" : "password"}
-                    value={editingUser?.password || ""}
-                    onChange={(e) =>
-                      setEditingUser((prev) =>
-                        prev ? { ...prev, password: e.target.value } : null
-                      )
-                    }
-                    placeholder="Leave blank to keep unchanged"
-                    className="font-poppins"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
           </div>

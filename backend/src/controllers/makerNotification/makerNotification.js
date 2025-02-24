@@ -74,8 +74,6 @@ exports.getMakerNotification = async (req, res) => {
             checkerseen: notification.checkerseen
         }));
 
-        console.log("changeTrackerNotifications:", changeTrackerNotifications);
-        console.log("addRowNotifications:", addRowNotifications);
         // Combine and sort notifications by updated_at
         const allNotifications = [...changeTrackerNotifications, ...addRowNotifications]
             .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));

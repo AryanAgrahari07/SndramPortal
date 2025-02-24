@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { API_URL } from "@/config/constants";
 
 interface Table {
   table_name: string;
@@ -48,13 +49,14 @@ export const TablesPage: React.FC = () => {
   //   Record<string, TableMetadata>
   // >({});
 
+  
   useEffect(() => {
     fetchGroups();
   }, []);
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch("http://localhost:8080/getgrouplist", {
+      const response = await fetch(`${API_URL}/getgrouplist`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -79,7 +81,7 @@ export const TablesPage: React.FC = () => {
   const loadTableMetadata = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/get-renamed-tables", {
+      const response = await fetch(`${API_URL}/get-renamed-tables`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -295,7 +297,7 @@ export const TablesPage: React.FC = () => {
                 <SelectTrigger className="w-[180px] bg-white">
                   <SelectValue placeholder="Select Group" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="all">All Groups</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.group_name} value={group.group_name}>
@@ -372,6 +374,11 @@ export const TablesPage: React.FC = () => {
                       </span>
                       <ArrowRight className="h-4 w-4 text-[#00bfa5] group-hover:translate-x-1 transition-transform" />
                     </div>
+                        {table.description && (
+                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                              {table.description}
+                            </p>
+                         )}
                     {selectedGroup !== "all" && (
                       <p className="text-sm text-gray-600 mt-2 line-clamp-2">
                         {selectedGroup}

@@ -456,7 +456,11 @@ const GroupConfiguration: React.FC = () => {
             <div className="space-y-4 py-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
               {selectedGroup &&
                 availableTables
-                  .filter((table) => !selectedGroup.tables.includes(table))
+                  .filter((table) => {
+                    // Ensure selectedGroup.tables is not null or undefined
+                    const groupTables = selectedGroup.tables || [];
+                    return !groupTables.includes(table);
+                  })
                   .map((table) => (
                     <div
                       key={table}

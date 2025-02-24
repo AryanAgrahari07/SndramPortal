@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getAuthHeaders } from "@/utils/authHeaders";
+import { API_URL } from "@/config/constants";
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = API_URL;
 
 interface NotificationResponse {
   success: boolean;

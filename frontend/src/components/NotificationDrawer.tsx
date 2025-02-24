@@ -39,6 +39,38 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const navigate = useNavigate();
   const userRole = role;
 
+  const handleClose = async () => {
+    if (userRole === "admin") {
+      return;
+    }
+
+    // Gathering unread notification IDs
+    const unreadIds = notifications
+      .filter((n) => (role === "maker" ? !n.makerseen : !n.checkerseen))
+      .map((n) => n.request_id);
+
+    // Marking unread notifications as seen
+    if (unreadIds.length > 0) {
+      const success = await notificationService.markNotificationsAsSeen(
+        userRole,
+        unreadIds
+      );
+      if (!success) {
+        toast({
+          title: "Error",
+          description: "Failed to mark notifications as seen",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      handleClose();
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       fetchNotifications();
@@ -73,31 +105,52 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         // setShowChangesDialog(true);
       }
     } else if (userRole === "admin") {
-      navigate(`/admin/tables/${notification.table_name}`);
+      navigate(`/admin?tab=rowRequests&table=${notification.table_name}`);
     }
     onClose();
   };
 
   const filteredNotifications = React.useMemo(() => {
-    if (activeTab === "all") return notifications;
+    if (userRole === "checker") {
+      // For checker role, filtering to show only unread notifications
+      return notifications.filter(
+        (n) => n.status.toLowerCase() === "pending" && !n.checkerseen
+      );
+    } else if (activeTab === "all") {
+      return notifications.filter((n) =>
+        userRole === "maker" ? !n.makerseen : true
+      );
+    }
     return notifications.filter((n) => n.status.toLowerCase() === activeTab);
-  }, [notifications, activeTab]);
+  }, [notifications, activeTab, userRole]);
 
 
   const getNotificationCounts = () => {
+    if (userRole === "admin") {
+      // For admin, just return the total count of notifications
+      return {
+        all: 0,  // no count of notifications for admin
+        approved: 0, // Admin doesn't need approved/rejected counts
+        rejected: 0,
+      };
+    }
+
     const approved = notifications.filter(
       (n) => n.status.toLowerCase() === "approved"
     ).length;
     const rejected = notifications.filter(
       (n) => n.status.toLowerCase() === "rejected"
     ).length;
+    const unread = notifications.filter((n) =>
+      userRole === "maker" ? !n.makerseen : !n.checkerseen
+    ).length;
+
     return {
-      all: notifications.length,
+      all: unread,
       approved,
       rejected,
     };
   };
-
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -133,17 +186,20 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     oldData: Record<string, unknown>,
     newData: Record<string, unknown>
   ) => {
-
-     // Getting only the changed fields
-     const changedFields = Object.keys(newData).filter(key => {
+    // Getting only the changed fields
+    const changedFields = Object.keys(newData).filter((key) => {
       // Skip if both values are empty/null/undefined
       if (
-        (oldData[key] === null || oldData[key] === undefined || oldData[key] === '') &&
-        (newData[key] === null || newData[key] === undefined || newData[key] === '')
+        (oldData[key] === null ||
+          oldData[key] === undefined ||
+          oldData[key] === "") &&
+        (newData[key] === null ||
+          newData[key] === undefined ||
+          newData[key] === "")
       ) {
         return false;
       }
-      
+
       // Skip if values are the same
       if (JSON.stringify(oldData[key]) === JSON.stringify(newData[key])) {
         return false;
@@ -156,39 +212,39 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
     return (
       <div className="mt-3 border-t pt-2">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <h4 className="text-xs font-medium text-gray-500 mb-2">
-            Previous Value
-          </h4>
-          {changedFields.map(key => (
-            <div key={key} className="mb-2">
-              <span className="text-xs text-gray-600 block">{key}:</span>
-              <span className="text-sm text-gray-900">
-                {oldData[key] === null || oldData[key] === undefined 
-                  ? '-'
-                  : String(oldData[key])}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div>
-          <h4 className="text-xs font-medium text-gray-500 mb-2">
-            New Value
-          </h4>
-          {changedFields.map(key => (
-            <div key={key} className="mb-2">
-              <span className="text-xs text-gray-600 block">{key}:</span>
-              <span className="text-sm text-gray-900">
-                {newData[key] === null || newData[key] === undefined 
-                  ? '-'
-                  : String(newData[key])}
-              </span>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h4 className="text-xs font-medium text-gray-500 mb-2">
+              Previous Value
+            </h4>
+            {changedFields.map((key) => (
+              <div key={key} className="mb-2">
+                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-sm text-gray-900">
+                  {oldData[key] === null || oldData[key] === undefined
+                    ? "-"
+                    : String(oldData[key])}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <h4 className="text-xs font-medium text-gray-500 mb-2">
+              New Value
+            </h4>
+            {changedFields.map((key) => (
+              <div key={key} className="mb-2">
+                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-sm text-gray-900">
+                  {newData[key] === null || newData[key] === undefined
+                    ? "-"
+                    : String(newData[key])}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
     );
   };
 
@@ -233,8 +289,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             </p>
           </div>
 
-           {/* Add Comment Section */}
-           {status === "rejected" && notification.comments && (
+          {/* Add Comment Section */}
+          {status === "rejected" && notification.comments && (
             <div className="mt-3 border-l border-red-200 bg-gray-50/80 pl-3 pr-2 py-2 rounded-sm">
               <div className="flex items-start gap-2.5">
                 <XCircle className="h-3.5 w-3.5 text-red-400/80 mt-1 flex-shrink-0" />
@@ -340,7 +396,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                     value="all"
                     className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
                   >
-                    All ({getNotificationCounts().all})
+                    Unread ({getNotificationCounts().all})
                   </TabsTrigger>
                   <TabsTrigger
                     value="approved"

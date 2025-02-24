@@ -29,6 +29,7 @@ interface RowRequest {
   maker: string;
   created_at: string;
   comments?: string;
+  maker_email: string;
 }
 
 interface RowDataDialogProps {
@@ -102,7 +103,12 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
   );
 };
 
-export default function RowRequestManager() {
+
+interface RowRequestManagerProps {
+  selectTable?: string | null;
+}
+
+export default function RowRequestManager({ selectTable }: RowRequestManagerProps) {
   const [requests, setRequests] = useState<RowRequest[]>([]);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [viewingData, setViewingData] = useState<RowData | null>(null);
@@ -113,6 +119,14 @@ export default function RowRequestManager() {
   );
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const { toast } = useToast();
+
+  
+  useEffect(() => {
+    if (selectTable) {
+      setSelectedTable(selectTable);
+    }
+  }, [selectTable]);
+
 
   // Get unique table names from requests
   const uniqueTableNames = Array.from(
@@ -431,7 +445,7 @@ export default function RowRequestManager() {
                   </div>
                 </TableCell>
                 <TableCell>{request.table_name}</TableCell>
-                <TableCell>{request.maker}</TableCell>
+                <TableCell>{request.maker_email}</TableCell>
                 <TableCell>
                   <span
                     className={`px-2 py-1 rounded-full text-xs ${

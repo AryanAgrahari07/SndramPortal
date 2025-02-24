@@ -23,8 +23,8 @@ exports.reject = async (req, res) => {
             WHERE ct.row_id = $1
             AND ct.status = 'pending';
         `;
-        console.log('Select Query:', selectQuery);
-        console.log('Select Query Params:', [row_id]);
+        // console.log('Select Query:', selectQuery);
+        // console.log('Select Query Params:', [row_id]);
         
         const selectResult = await client_update.query(selectQuery, [row_id]);
 
@@ -50,8 +50,8 @@ exports.reject = async (req, res) => {
             RETURNING *;
         `;
 
-        console.log('Update Tracker Query:', updateTrackerQuery);
-        console.log('Update Tracker Values:', ['rejected', comments || null, checker, row_id]);
+        // console.log('Update Tracker Query:', updateTrackerQuery);
+        // console.log('Update Tracker Values:', ['rejected', comments || null, checker, row_id]);
 
         const trackerValues = ['rejected', comments || null, checker, row_id];
         const trackerResult = await client_update.query(updateTrackerQuery, trackerValues);

@@ -19,7 +19,7 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({ tabs, onTabChang
                 ? "text-blue-600 font-medium border-b-2 border-blue-600"
                 : "text-gray-500 hover:text-gray-700"
             }`}
-          >
+           >
             {tab.label}
           </button>
         ))}

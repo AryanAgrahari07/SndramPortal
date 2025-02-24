@@ -8,6 +8,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import CheckerPage from "@/pages/CheckerPage";
 import { Overview, History, TableRequests } from "@/components/checker";
+import { RowRequestManager } from "./components/admin";
 
 const App: React.FC = () => {
   return (
@@ -32,6 +33,16 @@ const App: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/admin/row-requests"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <RowRequestManager />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/tables"
           element={

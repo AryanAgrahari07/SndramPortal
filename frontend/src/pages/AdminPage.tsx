@@ -1,14 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout } from "../components/Layout";
 import { UserManagement, RowRequestManager } from "@/components/admin";
 
 import Configuration from "@/components/admin/Configuration";
+import { useSearchParams } from "react-router-dom";
 
 const AdminPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<
     "rowRequests" | "configuration" | "userManagement"
   >("rowRequests");
   const firstName = localStorage.getItem("firstName") || "Admin";
+
+  const selectTable = searchParams.get("table");
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "rowRequests") {
+      setActiveTab("rowRequests");
+    }
+  }, [searchParams]);
 
   return (
     <Layout>
@@ -58,7 +68,7 @@ const AdminPage: React.FC = () => {
 
         {/* Content Area */}
         <div className="mt-6">
-          {activeTab === "rowRequests" && <RowRequestManager />}
+          {activeTab === "rowRequests" && <RowRequestManager selectTable = {selectTable} />}
           {activeTab === "configuration" && <Configuration />}
           {activeTab === "userManagement" && <UserManagement />}
         </div>

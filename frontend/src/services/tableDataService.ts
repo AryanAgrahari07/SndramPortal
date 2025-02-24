@@ -72,7 +72,7 @@ const DEFAULT_PAGINATION: PaginationData = {
   pageSize: 10,
 };
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = API_URL;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -251,9 +251,12 @@ export const addTableRow = async (
     }
 
     return response.data;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error adding row:", error);
-    throw error;
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(error.response.data.message || "Failed to add row");
+    }
+    throw new Error("Failed to add row");
   }
 };
 

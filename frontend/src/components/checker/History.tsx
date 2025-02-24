@@ -75,35 +75,6 @@ export const History = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [searchText, setSearchText] = useState("");
 
-  // Update to use the existing getUserEmails endpoint
-  // const fetchUserEmails = async (
-  //   userIds: string[]
-  // ): Promise<Record<string, string>> => {
-
-  //   if (userIds.length === 0) return {};
-  //   try {
-  //     const response = await fetch(`${API_URL}/users/emails`, {
-  //       method: "POST",
-  //       headers: {
-  //         Authorization: `Bearer ${localStorage.getItem("token")}`,
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({ userIds }),
-  //     });
-
-  //     const data = await response.json();
-
-  //     if (!data.success) {
-  //       throw new Error(data.message || "Failed to fetch user emails");
-  //     }
-
-  //     return data.emails || {};
-  //   } catch (error) {
-  //     console.error("Error fetching user emails:", error);
-  //     return {};
-  //   }
-  // };
-
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
     // const { start, end } = getDateRange(dateFilter);
@@ -119,18 +90,6 @@ export const History = () => {
         itemsPerPage
       );
       if (data.success) {
-        // const makerIds = Array.from(
-        //   new Set(data.data.map((req: any) => req.maker))
-        // );
-
-        // Fetch emails using the getUserEmails endpoint
-        // const emailMap = await fetchUserEmails(makerIds as string[]);
-
-        // Add emails to requests
-        // const requestsWithEmails = data.data.map((request: HistoryRequest) => ({
-        //   ...request,
-        // maker_email: emailMap[request.maker] || request.maker,
-        // }));
 
         setRequests(data.data);
         // setTotalPages(data.total);
@@ -263,24 +222,6 @@ export const History = () => {
             className="pl-10 w-full sm:w-[300px]"
           />
         </div>
-
-        {/* <Select
-          value={dateFilter}
-          onValueChange={(value: DateFilter) => setDateFilter(value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <Calendar className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Select date range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="last7days">Last 7 Days</SelectItem>
-            <SelectItem value="last30days">Last 30 Days</SelectItem>
-            <SelectItem value="last90days">Last 90 Days</SelectItem>
-            <SelectItem value="custom">Custom Range</SelectItem>
-          </SelectContent>
-        </Select> */}
 
         {/* {dateFilter === "custom" && ( */}
         <div className="flex items-center gap-2">

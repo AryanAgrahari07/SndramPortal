@@ -53,7 +53,7 @@ export const createUser = async (userData: User) => {
       `${API_BASE_URL}/signup`,
       {
         email: userData.email,
-        password: userData.password,
+        // password: userData.password,
         role: userData.role,
         first_name: userData.firstName,
         last_name: userData.lastName,
@@ -71,10 +71,11 @@ export const createUser = async (userData: User) => {
   }
 };
 
-export const getAllUsers = async () => {
+export const getAllUsers = async (searchQuery: string) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/users`, {
       headers: getAuthHeaders(),
+      params: { searchQuery },
     });
     return response.data;
   } catch (error) {

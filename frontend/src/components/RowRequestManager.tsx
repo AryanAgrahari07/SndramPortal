@@ -10,7 +10,11 @@ import { RejectDialog } from './dialogs/RejectDialog'
 import { rowRequestApi } from '../services/rowRequestApi'
 import { RowRequest } from '../types/rowRequest'
 
-export const RowRequestManager: React.FC = () => {
+interface RowRequestManagerProps {
+  selectTable?: string | null;
+}
+
+export const RowRequestManager: React.FC<RowRequestManagerProps> = ({ selectTable }) => {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<RowRequest[]>([])
@@ -30,7 +34,11 @@ export const RowRequestManager: React.FC = () => {
     try {
       setLoading(true)
       const data = await rowRequestApi.fetchRequests()
-      setRequests(data)
+      
+      const filteredData = selectTable
+      ? data.filter(request => request.table_name === selectTable)
+      : data;
+    setRequests(filteredData);
     } catch (error) {
       console.error('Error fetching requests:', error)
       toast({
@@ -41,7 +49,7 @@ export const RowRequestManager: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, selectTable])
 
   useEffect(() => {
     fetchRequests()

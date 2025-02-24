@@ -6,11 +6,11 @@ const { v4: uuidv4 } = require("uuid");
 
 // Create a new user
 exports.createUser = async (req, res) => {
-  const { email, password, role, first_name, last_name } = req.body;
+  const { email, role, first_name, last_name } = req.body;
 
   try {
     // Validate required fields
-    if (!email || !password || !role || !first_name || !last_name) {
+    if (!email  || !role || !first_name || !last_name) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -34,29 +34,27 @@ exports.createUser = async (req, res) => {
     const userId = uuidv4();
 
     // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // const salt = await bcrypt.genSalt(10);
+    // const hashedPassword = await bcrypt.hash(password, salt);
 
     // Insert new user
     const query = `
             INSERT INTO app.users (
                 user_id,
                 email,
-                password_hash,
                 role,
                 first_name,
                 last_name,
                 created_at,
                 updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING user_id, email, role, first_name, last_name, created_at;
         `;
 
     const result = await client_update.query(query, [
       userId,
       email,
-      hashedPassword,
       role,
       first_name,
       last_name,
@@ -79,13 +77,20 @@ exports.createUser = async (req, res) => {
 
 // Get all users
 exports.getAllUsers = async (req, res) => {
+
+  const { searchQuery } = req.query; 
+
   try {
     const query = `
             SELECT user_id, email, role, first_name, last_name, active, created_at, updated_at
             FROM app.users
+            ${searchQuery ? `WHERE (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1)` : ''}
             ORDER BY created_at DESC;
         `;
-    const result = await client_update.query(query);
+
+    const values = searchQuery ? [`%${searchQuery}%`] : [];
+    
+    const result = await client_update.query(query, values);
 
     res.status(200).json({
       success: true,
@@ -137,7 +142,7 @@ exports.getUserById = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { email, password, role, first_name, last_name } = req.body;
+  const { email, role, first_name, last_name } = req.body;
 
   try {
     let updateFields = [];
@@ -150,13 +155,13 @@ exports.updateUser = async (req, res) => {
       valueIndex++;
     }
 
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      updateFields.push(`password_hash = $${valueIndex}`);
-      values.push(hashedPassword);
-      valueIndex++;
-    }
+    // if (password) {
+    //   const salt = await bcrypt.genSalt(10);
+    //   const hashedPassword = await bcrypt.hash(password, salt);
+    //   updateFields.push(`password_hash = $${valueIndex}`);
+    //   values.push(hashedPassword);
+    //   valueIndex++;
+    // }
 
     if (role) {
       updateFields.push(`role = $${valueIndex}`);
@@ -248,14 +253,14 @@ exports.deleteUser = async (req, res) => {
 
 // Sign in user
 exports.signin = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, role } = req.body;
 
   try {
     // Validate input
-    if (!email || !password || !role) {
+    if (!email || !role) {
       return res.status(400).json({
         success: false,
-        message: "Email, password, and role are required",
+        message: "Email, and role are required",
       });
     }
 
@@ -273,14 +278,14 @@ exports.signin = async (req, res) => {
     const user = result.rows[0];
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    // const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
-    if (!isValidPassword) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
+    // if (!isValidPassword) {
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: "Invalid credentials",
+    //   });
+    // }
 
     // Determine redirect path based on role
     let redirectPath;
@@ -299,7 +304,7 @@ exports.signin = async (req, res) => {
     }
 
     // Remove password from response
-    delete user.password_hash;
+    // delete user.password_hash;
 
     res.status(200).json({
       success: true,

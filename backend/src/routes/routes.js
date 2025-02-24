@@ -83,17 +83,19 @@ const {
   updateRenamedTable,
 } = require("../controllers/tableMetadata/tableMetadata.js");
 
-const { getTableData } = require('../controllers/tableData/getTableData');
-const { getUserEmails } = require('../controllers/userEmails/getUserEmails.js');
-// const { markNotificationsAsSeen } = require('../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js');
+const { getTableData } = require("../controllers/tableData/getTableData");
+const { getUserEmails } = require("../controllers/userEmails/getUserEmails.js");
+const {
+  markNotificationsAsSeen,
+} = require("../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js");
 
-// router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
+router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
-// users email data 
-router.post('/users/emails', verifyToken, getUserEmails);
+// users email data
+router.post("/users/emails", verifyToken, getUserEmails);
 
 // table data routes
-router.get('/api/tabledata/:tableName',verifyToken, getTableData);
+router.get("/api/tabledata/:tableName", verifyToken, getTableData);
 
 // Public routes
 router.post("/signup", verifyToken, authorize("admin"), createUser);

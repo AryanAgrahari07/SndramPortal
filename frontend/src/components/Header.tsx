@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { NotificationDrawer } from "./NotificationDrawer";
 import { ChevronDown, Bell } from "lucide-react";
 import logo from "../assets/images/Logo-Full.svg";
-    
+import { notificationService } from "@/services/notificationService";
+
 export const Header: React.FC = () => {
   const [showLogout, setShowLogout] = useState(false);
   const [userData, setUserData] = useState({
@@ -12,7 +13,7 @@ export const Header: React.FC = () => {
     email: "",
   });
   const [isOpen, setIsOpen] = useState(false);
-
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     // Get user data from localStorage
@@ -22,6 +23,24 @@ export const Header: React.FC = () => {
     const email = localStorage.getItem("userEmail") || "";
     setUserData({ firstName, lastName, role, email });
   }, []);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      const data = await notificationService.fetchNotifications(
+        userData.role as "maker" | "checker"
+      );
+      const count = data.filter((n) =>
+        userData.role === "maker" ? !n.makerseen : !n.checkerseen
+      ).length;
+      if (userData.role === "admin") {
+        setUnreadCount(0);
+        return;
+      }
+      setUnreadCount(count);
+    };
+
+    fetchUnreadCount();
+  }, [userData.role, isOpen]);
 
   const handleLogout = () => {
     // Clear localStorage
@@ -57,12 +76,19 @@ export const Header: React.FC = () => {
           {/* Right side items */}
           <div className="flex items-center space-x-4">
             {/* Notification Icon */}
-            <button
-              onClick={() => setIsOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <Bell className="h-5 w-5 text-[#123C90]" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setIsOpen(true)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Bell className="h-5 w-5 text-[#123C90]" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
             <NotificationDrawer
               isOpen={isOpen}
               onClose={() => setIsOpen(false)}

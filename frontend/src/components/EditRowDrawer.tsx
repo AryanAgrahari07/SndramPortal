@@ -33,7 +33,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
   useEffect(() => {
     if (row) {
-      // Only include editable columns in form data
+      // Only including editable columns in form data
       const editableData = columns.reduce((acc, column) => {
         if (isColumnEditable(column)) {
           acc[column] = row[column] || "";
@@ -42,7 +42,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       }, {} as Record<string, unknown>);
       setFormData(editableData);
     } else {
-      // For new rows, only include editable columns
+      // For new rows, including all editable columns
       const newRowData = columns.reduce((acc, column) => {
         if (isColumnEditable(column)) {
           acc[column] = "";
@@ -129,7 +129,8 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="px-4 py-6 space-y-6 sm:px-6">
                   {columns.map((column) => {
-                    // Convert column names to a consistent format for comparison
+
+                    // Converting column names to a consistent format for comparison
                     const normalizedColumn = column
                       .toLowerCase()
                       .replace(/_/g, "");
@@ -144,14 +145,14 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                       ? String(row[column])
                       : "";
 
-                    console.log(
-                      "Column:",
-                      column,
-                      "Normalized:",
-                      normalizedColumn,
-                      "Available dropdowns:",
-                      dropdownColumns.map((dc) => dc.columnName)
-                    ); // Debug log
+                    // console.log(
+                    //   "Column:",
+                    //   column,
+                    //   "Normalized:",
+                    //   normalizedColumn,
+                    //   "Available dropdowns:",
+                    //   dropdownColumns.map((dc) => dc.columnName)
+                    // );                                                 // Debug log
 
                     return (
                       <div key={column}>
@@ -172,7 +173,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                             placeholder="Select a value"
                             className="mt-1"
                             options={[
-                              // Include existing value at the top if it exists and isn't in options
+                              // Including existing value at the top if it exists and isn't in options
                               ...(existingValue &&
                               !dropdownConfig.options.includes(existingValue)
                                 ? [
