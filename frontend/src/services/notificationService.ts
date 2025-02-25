@@ -64,8 +64,8 @@ export const notificationService = {
     }
 
     try {
-      console.log(requestIds);
-      console.log(role);
+      // console.log(requestIds);
+      // console.log(role);
 
       const response = await fetch(`${API_URL}/mark-notifications-seen`, {
         method: "POST",
@@ -166,6 +166,7 @@ export const notificationService = {
 
       const responseData: NotificationResponse = await response.json();
 
+      // console.log(responseData);
       if (!responseData.success) {
         throw new Error(
           responseData.message || "Failed to fetch notifications"

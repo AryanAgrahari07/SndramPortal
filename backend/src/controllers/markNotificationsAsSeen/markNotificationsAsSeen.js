@@ -21,18 +21,32 @@ exports.markNotificationsAsSeen = async (req, res) => {
       columnToUpdate = "checkerseen";
     }
 
-    const query = `
+    const changeTrackerQuery = `
             UPDATE app.change_tracker
             SET ${columnToUpdate} = true
             WHERE request_id = ANY($1::uuid[]) AND ${columnToUpdate} = false;
         `;
 
-    const result = await client_update.query(query, [requestIds]);
+    const addRowQuery = `
+        UPDATE app.add_row_table
+        SET ${columnToUpdate} = true
+        WHERE request_id = ANY($1::uuid[]) AND ${columnToUpdate} = false;
+      `;
+
+      const [changeTrackerResult, addRowResult] = await Promise.all([
+        client_update.query(changeTrackerQuery, [requestIds]),
+        client_update.query(addRowQuery, [requestIds])
+      ]);
+
+      await client_update.query('COMMIT');
+
+      const totalUpdated = changeTrackerResult.rowCount + addRowResult.rowCount;
+
 
     return res.status(200).json({
       success: true,
       message: "Notifications marked as seen successfully.",
-      result: result.rowCount,
+      result: totalUpdated,
     });
   } catch (error) {
     console.error("Error marking notifications as seen:", error);

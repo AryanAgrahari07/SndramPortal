@@ -124,12 +124,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     return notifications.filter((n) => n.status.toLowerCase() === activeTab);
   }, [notifications, activeTab, userRole]);
 
-
   const getNotificationCounts = () => {
     if (userRole === "admin") {
       // For admin, just return the total count of notifications
       return {
-        all: 0,  // no count of notifications for admin
+        all: 0, // no count of notifications for admin
         approved: 0, // Admin doesn't need approved/rejected counts
         rejected: 0,
       };
@@ -184,8 +183,27 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
   const renderChanges = (
     oldData: Record<string, unknown>,
-    newData: Record<string, unknown>
+    newData: Record<string, unknown>,
+    type: "change" | "add_row"
   ) => {
+    if (type === "add_row") {
+      return (
+        <div className="mt-3 border-t pt-2">
+          <div>
+            <h4 className="text-xs font-medium text-gray-500 mb-2">Row Data</h4>
+            {Object.entries(newData).map(([key, value]) => (
+              <div key={key} className="mb-2">
+                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-sm text-gray-900">
+                  {value === null || value === undefined ? "-" : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     // Getting only the changed fields
     const changedFields = Object.keys(newData).filter((key) => {
       // Skip if both values are empty/null/undefined
@@ -324,9 +342,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           </div>
 
           {showChanges &&
-            notification.old_data &&
-            notification.new_data &&
-            renderChanges(notification.old_data, notification.new_data)}
+            notification.type && // Make sure type exists
+            ((notification.type === "add_row" && notification.data) || // For add_row
+              (notification.type === "change" &&
+                notification.old_data &&
+                notification.new_data)) && // For change_tracker
+            renderChanges(
+              notification.old_data || {},
+              notification.type === "add_row"
+                ? notification.data!
+                : notification.new_data!,
+              notification.type
+            )}
         </div>
       </div>
     );

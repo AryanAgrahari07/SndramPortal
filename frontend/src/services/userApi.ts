@@ -24,7 +24,7 @@ interface HighlightResponse {
 
 const API_BASE_URL = "http://localhost:8080";
 
-export type UserRole = "maker" | "checker";
+export type UserRole = "maker" | "checker" | "admin";
 
 export interface User {
   id?: number;

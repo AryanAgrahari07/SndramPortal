@@ -27,15 +27,20 @@ exports.getMakerNotification = async (req, res) => {
         const addRowQuery = `
             SELECT 
                 table_name,
-                status,
+                CASE 
+                    WHEN status = 'approve' THEN 'approved'
+                    ELSE status 
+                END as status,
                 admin as approver,
                 updated_at,
                 row_data as data,
                 comments,
-                request_id
+                request_id,
+                makerseen,
+                checkerseen
             FROM app.add_row_table 
             WHERE maker = $1 
-            AND status IN ('approved', 'rejected')
+            AND status IN ('approve', 'rejected')
             ORDER BY updated_at DESC
         `;
 
@@ -78,6 +83,9 @@ exports.getMakerNotification = async (req, res) => {
         const allNotifications = [...changeTrackerNotifications, ...addRowNotifications]
             .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
 
+        // console.log(allNotifications);
+        // console.log(changeTrackerNotifications);
+        // console.log(addRowNotifications);
         return res.status(200).json({
             success: true,
             notifications: allNotifications
