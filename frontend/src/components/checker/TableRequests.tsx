@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import {
-  ArrowLeft,
-  CheckCircle,
-  XCircle,
-  FileWarning,
-  Eye,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, FileWarning } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { API_URL, ENDPOINTS } from "@/config/constants";
 import {
@@ -69,32 +63,33 @@ export const TableRequests = () => {
   const [selectedChange, setSelectedChange] = useState<ChangeRequest | null>(
     null
   );
-  
 
-  const fetchUserEmails = async (userIds: string[]): Promise<Record<string, string>> => {
+  const fetchUserEmails = async (
+    userIds: string[]
+  ): Promise<Record<string, string>> => {
     if (userIds.length === 0) return {};
     try {
-        const response = await fetch(`${API_URL}/users/emails`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ userIds }),
-        });
+      const response = await fetch(`${API_URL}/users/emails`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userIds }),
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!data.success) {
-            throw new Error(data.message || "Failed to fetch user emails");
-        }
+      if (!data.success) {
+        throw new Error(data.message || "Failed to fetch user emails");
+      }
 
-        return data.emails || {};
+      return data.emails || {};
     } catch (error) {
-        console.error("Error fetching user emails:", error);
-        return {};
+      console.error("Error fetching user emails:", error);
+      return {};
     }
-};
+  };
 
   // Fetch requests
   const fetchRequests = useCallback(async () => {
@@ -113,21 +108,23 @@ export const TableRequests = () => {
       if (data.success) {
         // Filter requests for current table
         const tableRequests = data.data.filter(
-            (req) => req.table_name === tableName && req.status === "pending"
+          (req) => req.table_name === tableName && req.status === "pending"
         );
 
         // Fetch emails for makers
-        const makerIds = Array.from(new Set(tableRequests.map((req) => req.maker)));
+        const makerIds = Array.from(
+          new Set(tableRequests.map((req) => req.maker))
+        );
         const emailMap = await fetchUserEmails(makerIds as string[]);
 
         // Add emails to requests
         const requestsWithEmails = tableRequests.map((request) => ({
-            ...request,
-            maker_email: emailMap[request.maker] || request.maker,
+          ...request,
+          maker_email: emailMap[request.maker] || request.maker,
         }));
 
         setRequests(requestsWithEmails);
-    }
+      }
     } catch (error) {
       console.log(error);
       toast({
@@ -493,36 +490,37 @@ export const TableRequests = () => {
 
                   {/* Add dynamic columns */}
                   {getRelevantColumns(requests).map((column) => {
-
                     const oldValue = request.old_data[column];
                     const newValue = request.new_data[column];
 
                     console.log(`Comparing column: ${column}`);
-                    console.log(`Old Value: ${oldValue}, New Value: ${newValue}`);
+                    console.log(
+                      `Old Value: ${oldValue}, New Value: ${newValue}`
+                    );
 
-                    
-                    const hasChanged = (oldValue !== newValue) && 
-                                      !(oldValue === null && newValue === null) && 
-                                      !(oldValue === "" && newValue === "") && 
-                                      !(oldValue === "" && newValue === null) && 
-                                      !(oldValue === null && newValue === "" ) && 
-                                      !(oldValue === undefined && newValue === undefined);
+                    const hasChanged =
+                      oldValue !== newValue &&
+                      !(oldValue === null && newValue === null) &&
+                      !(oldValue === "" && newValue === "") &&
+                      !(oldValue === "" && newValue === null) &&
+                      !(oldValue === null && newValue === "") &&
+                      !(oldValue === undefined && newValue === undefined);
 
                     return (
                       <TableCell key={column}>
                         {hasChanged ? (
                           <div className="flex items-center gap-2">
                             <span className="line-through text-red-500">
-                                 {oldValue?.toString() || "null"}
+                              {oldValue?.toString() || "null"}
                             </span>
                             <span className="text-gray-400">→</span>
                             <span className="text-green-600">
-                                 {newValue?.toString() || "null"}
+                              {newValue?.toString() || "null"}
                             </span>
                           </div>
                         ) : (
                           <span className="text-gray-600">
-                                 {newValue?.toString() || "null"}
+                            {newValue?.toString() || "null"}
                           </span>
                         )}
                       </TableCell>

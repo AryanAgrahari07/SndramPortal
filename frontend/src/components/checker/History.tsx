@@ -77,20 +77,14 @@ export const History = () => {
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
-    // const { start, end } = getDateRange(dateFilter);
     try {
       const data = await fetchCheckerRequests(
         searchQuery,
         filterStatus,
-        // start?.toISOString(),
-        // end?.toISOString(),
         customDateRange.from,
-        customDateRange.to,
-        currentPage,
-        itemsPerPage
+        customDateRange.to
       );
       if (data.success) {
-
         setRequests(data.data);
         // setTotalPages(data.total);
         setTotalPages(Math.ceil(data.total / itemsPerPage));
@@ -107,7 +101,7 @@ export const History = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, filterStatus, currentPage, customDateRange]);
+  }, [searchQuery, filterStatus, customDateRange, dateFilter]);
 
   useEffect(() => {
     loadRequests();
@@ -118,7 +112,6 @@ export const History = () => {
     setCurrentPage(1); // Reset to the first page
     loadRequests();
   };
-
 
   const handleDateChange = (type: "from" | "to", value: string) => {
     setCustomDateRange((prev) => ({
