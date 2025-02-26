@@ -37,12 +37,12 @@ async function sendOTPEmail(recipientEmail, otp) {
     const mailOptions = {
         from: process.env.OTP_EMAIL,
         to: recipientEmail,
-        subject: 'Your OTP Code (Valid for 90 seconds)',
+        subject: 'Your OTP Code (Valid for 30 seconds)',
         html: `
             <div style="font-family: Arial, sans-serif; padding: 20px;">
                 <h2>OTP Verification</h2>
                 <p>Your OTP code is: <strong>${otp}</strong></p>
-                <p>This code will expire in 90 seconds. Please use it immediately.</p>
+                <p>This code will expire in 30 seconds. Please use it immediately.</p>
                 <p>If you didn't request this code, please ignore this email.</p>
             </div>
         `
@@ -133,7 +133,7 @@ exports.sendOTP = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'OTP generated and sent successfully. Valid for 90 seconds.',
+            message: 'OTP generated and sent successfully. Valid for 30 seconds.',
         });
     } catch (error) {
         await client_update.query('ROLLBACK');

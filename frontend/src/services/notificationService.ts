@@ -140,6 +140,8 @@ export const notificationService = {
   ): Promise<Notification[]> {
     const token = localStorage.getItem("token");
 
+   
+
     if (!token) {
       console.error("No authentication token found");
       return [];

@@ -11,6 +11,7 @@ import { Overview, History, TableRequests } from "@/components/checker";
 import { RowRequestManager } from "./components/admin";
 
 const App: React.FC = () => {
+
   return (
     <ErrorBoundary>
       <Routes>

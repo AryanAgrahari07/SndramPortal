@@ -88,6 +88,100 @@ const { getUserEmails } = require("../controllers/userEmails/getUserEmails.js");
 const {
   markNotificationsAsSeen,
 } = require("../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js");
+const { validateSession } = require("../middleware/tokenMiddleware.js");
+const { logout } = require("../controllers/logout/logout.js");
+const { refreshToken } = require("../controllers/refreshToken/refreshToken.js");
+const { client_update } = require("../configuration/database/databaseUpdate.js");
+
+
+
+
+router.post('/refresh-token', refreshToken);
+// router.post('/logout', validateSession, logout);
+
+// Protect all routes that require authentication
+// router.use(validateSession);
+
+
+// ... existing code ...
+
+router.get('/check-session', verifyToken, async (req, res) => {
+  try {
+    const sessionId = req.headers['x-session-id'];
+
+    // console.log("sessionId", sessionId);
+    // console.log("req.headers", req.headers);
+
+    if (!sessionId) {
+      return res.status(401).json({
+        success: false,
+        message: 'No session ID provided',
+        code: 'NO_SESSION_ID'
+      });
+    }
+
+    const result = await client_update.query(
+         `SELECT is_active, expires_at
+          FROM app.user_sessions
+          WHERE session_id = $1
+          AND is_active = true
+          AND expires_at > NOW()`,
+        [sessionId]
+   );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired Session',
+        code: 'SESSION_NOT_FOUND'
+      });
+    }
+
+    const session = result.rows[0];
+    
+    // console.log("session", session);
+    // console.log("session.expires_at", session.expires_at);
+    // console.log("new Date()", new Date());
+    // console.log("new Date(session.expires_at) < new Date()", new Date(session.expires_at) < new Date());
+
+    // Check if session is expired
+    if (new Date(session.expires_at) < new Date()) {
+      await client_update.query(
+        'UPDATE app.user_sessions SET is_active = false WHERE session_id = $1',
+        [sessionId]
+      );
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired',
+        code: 'SESSION_EXPIRED'
+      });
+    }
+
+    // Check if session and user are both active
+    if (!session.is_active ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session inactive',
+        code: 'INACTIVE'
+      });
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Session valid'
+    });
+
+  } catch (error) {
+    console.error('Session validation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error validating session',
+      error: error.message 
+    });
+  }
+});
+
+// ... existing code ...
 
 router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
