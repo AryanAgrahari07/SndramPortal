@@ -9,10 +9,12 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import CheckerPage from "@/pages/CheckerPage";
 import { Overview, History, TableRequests } from "@/components/checker";
 import { RowRequestManager } from "./components/admin";
+import { Toaster } from "./components/ui/toaster";
 
 const App: React.FC = () => {
 
   return (
+    <>
     <ErrorBoundary>
       <Routes>
         <Route path="/" element={<LoginPage />} />
@@ -66,6 +68,8 @@ const App: React.FC = () => {
         </Route>
       </Routes>
     </ErrorBoundary>
+    <Toaster />
+    </>
   );
 };
 

@@ -249,7 +249,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
       toast({
         title: "Error",
         description: "Failed to load dropdown options",
-        variant: "destructive",
       });
     } finally {
       setIsLoadingDropdowns(false);
@@ -317,7 +316,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
       console.error("Error saving row:", err);
       setError(err instanceof Error ? err.message : "Failed to save changes");
       toast({
-        variant: "destructive",
         title: "Error",
         description: "Failed to save changes",
       });

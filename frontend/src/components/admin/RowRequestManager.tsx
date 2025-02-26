@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { ConfirmDialog } from "../ConfirmDialog";
 
 interface RowData {
   [key: string]: string | number | boolean | null | undefined;
@@ -119,6 +120,11 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
   );
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const { toast } = useToast();
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    requestId: '',
+    isBulk: false,
+  });
 
   
   useEffect(() => {
@@ -177,7 +183,17 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
     }
   };
 
-  const handleAccept = async (requestId: string) => {
+
+   const handleAccept = async (requestId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      requestId,
+      isBulk: false,
+    });
+  };
+
+
+  const handleConfirmAccept = async (requestId: string) => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
@@ -262,8 +278,17 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
     });
   };
 
+
+  const handleBulkAccept = () => {
+    setConfirmDialog({
+      isOpen: true,
+      requestId: '',
+      isBulk: true,
+    });
+  };
+
   // Add bulk operations
-  const handleBulkAccept = async () => {
+  const handleBulkAcceptConfirm = async () => {
     if (selectedRequests.length === 0) return;
     try {
       setIsLoading(true);
@@ -425,9 +450,14 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
+                    {/* Updated Accept button with confirmation dialog */}
                     <button
                       className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
-                      onClick={() => handleAccept(request.request_id)}
+                      onClick={() => setConfirmDialog({
+                        isOpen: true,
+                        requestId: request.request_id,
+                        isBulk: false
+                      })}
                       disabled={isLoading}
                     >
                       <Check className="h-4 w-4" />
@@ -475,15 +505,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
         </TableBody>
       </Table>
 
-      {viewingData && (
-        <RowDataDialog
-          isOpen={true}
-          onClose={() => setViewingData(null)}
-          data={viewingData}
-          title="Row Data Details"
-        />
-      )}
-
+      {/* Bulk Actions */}
       {selectedRequests.length > 0 && (
         <div className="mb-4 flex justify-end space-x-2">
           <button
@@ -496,9 +518,14 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
           >
             Reject Selected ({selectedRequests.length})
           </button>
+          {/* Updated Bulk Accept button with confirmation dialog */}
           <button
             className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
-            onClick={handleBulkAccept}
+            onClick={() => setConfirmDialog({
+              isOpen: true,
+              requestId: '',
+              isBulk: true
+            })}
             disabled={isLoading}
           >
             Accept Selected ({selectedRequests.length})
@@ -506,6 +533,17 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
         </div>
       )}
 
+      {/* View Data Dialog */}
+      {viewingData && (
+        <RowDataDialog
+          isOpen={true}
+          onClose={() => setViewingData(null)}
+          data={viewingData}
+          title="Row Data Details"
+        />
+      )}
+
+      {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="sm:max-w-[400px] p-0">
           <DialogHeader className="px-6 py-4 border-b">
@@ -567,6 +605,27 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Dialog - New Addition */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, requestId: '', isBulk: false })}
+        onConfirm={() => {
+          if (confirmDialog.isBulk) {
+            handleBulkAcceptConfirm();
+          } else {
+            handleConfirmAccept(confirmDialog.requestId);
+          }
+          setConfirmDialog({ isOpen: false, requestId: '', isBulk: false });
+        }}
+        title={`Confirm ${confirmDialog.isBulk ? 'Bulk ' : ''}Approval`}
+        description={
+          confirmDialog.isBulk
+            ? `Are you sure you want to approve ${selectedRequests.length} selected requests?`
+            : "Are you sure you want to approve this request?"
+        }
+        variant="success"
+      />
     </div>
   );
 }

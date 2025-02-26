@@ -68,6 +68,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       if (mode === "add") {
         await addTableRow(tableName, formData);
         toast({
+          variant: "success",
           title: "Success",
           description: "Row added successfully",
         });
@@ -79,11 +80,17 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         };
         onSave(updatedRow);
       }
+
+      toast({
+            title: "Changes Saved",
+                description: "Your changes have been saved successfully.",
+               // Assuming your toast system supports variants
+         });
       onClose();
     } catch (error) {
       toast({
-        variant: "destructive",
         title: "Error",
+        variant: "destructive",
         description:
           error instanceof Error ? error.message : "Failed to process request",
       });
@@ -110,7 +117,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                       {mode === "edit" ? "Edit Row" : "Add Row"}
                     </h2>
                     <p className="text-sm text-gray-500">
-                      Only editable fields are shown
+                      Only editable fields can be changed
                     </p>
                   </div>
                   <div className="h-7 flex items-center">

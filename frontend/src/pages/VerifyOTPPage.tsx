@@ -5,13 +5,11 @@ import { authService } from "../services/authService";
 import { Loader2 } from "lucide-react";
 import { useOTPTimer } from "../hooks/useOTPTimer";
 import { config } from "../config/env";
-// import axios from "axios";
-import TokenService from '../services/tokenService';
 
 interface AuthResponse {
   success: boolean;
   message?: string;
-  // token?: string;
+  token?: string;
   data?: {
     email: string;
     role: string;
@@ -19,11 +17,6 @@ interface AuthResponse {
     last_name: string;
   };
   redirectPath?: string;
-  tokens?: {
-    accessToken: string;
-    refreshToken: string;
-    session_id: string;
-  };
 }
 
 export const VerifyOTPPage: React.FC = () => {
@@ -33,11 +26,9 @@ export const VerifyOTPPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const email = location.state?.email;
-  // const email = sessionStorage.getItem('email');
   const { timeLeft, startTimer, isActive } = useOTPTimer(
     config.otpExpirySeconds
   );
-
 
   useEffect(() => {
     if (!email) {
@@ -86,33 +77,16 @@ export const VerifyOTPPage: React.FC = () => {
         email,
         otp
       )) as AuthResponse;
-
-      if (response.success && response.tokens && response.data) {
-        TokenService.setTokens(
-          response.tokens.accessToken,
-          response.tokens.refreshToken,
-          response.tokens.session_id
-      );
-
-      localStorage.setItem("token", response.tokens.accessToken);
-      localStorage.setItem("userRole", response.data.role.toLowerCase());
-      localStorage.setItem("userEmail", response.data.email);
-      localStorage.setItem("firstName", response.data.first_name);
-      localStorage.setItem("lastName", response.data.last_name);
-      
-      // Store user data in a more secure way
-      const userData = {
-          email: response.data.email,
-          role: response.data.role.toLowerCase(),
-          firstName: response.data.first_name,
-          lastName: response.data.last_name
-      };
-
-      // Store user data in sessionStorage instead of localStorage for better security
-      sessionStorage.setItem('userData', JSON.stringify(userData));
+      if (response.success && response.token && response.data) {
+        // Store user data in localStorage
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("userRole", response.data.role.toLowerCase());
+        localStorage.setItem("userEmail", response.data.email);
+        localStorage.setItem("firstName", response.data.first_name);
+        localStorage.setItem("lastName", response.data.last_name);
 
         // Redirect based on role
-        const role = userData.role.toLowerCase();
+        const role = response.data.role.toLowerCase();
         switch (role) {
           case "admin":
             navigate("/admin");
