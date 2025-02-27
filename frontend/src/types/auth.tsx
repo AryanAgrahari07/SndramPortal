@@ -8,6 +8,7 @@ export interface LoginResponse {
   success: boolean
   message: string
   token?: string
+  refreshToken?: string
   error?: string
   data?: {
     email: string

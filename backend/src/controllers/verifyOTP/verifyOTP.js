@@ -2,7 +2,9 @@ const {
   client_update,
 } = require("../../configuration/database/databaseUpdate.js");
 const bcrypt = require("bcrypt");
+const UAParser = require("ua-parser-js");
 const jwt = require("jsonwebtoken");
+const authService = require("../../services/authService.js");
 require("dotenv").config();
 
 exports.verifyOTP = async (req, res) => {
@@ -100,18 +102,58 @@ exports.verifyOTP = async (req, res) => {
         await client_update.query(updateQuery, [email]);
         await client_update.query("COMMIT");
 
-        // Generate JWT token
-        const token = jwt.sign(
-          {
-            user_id: user.user_id,
-            email: user.email,
-            role: user.role,
-            first_name: user.first_name,
-            last_name: user.last_name,
-          },
-          process.env.JWT_SECRET,
-          { expiresIn: "24h" }
+        const userQuery = `
+                        SELECT * FROM app.users WHERE email = $1 AND active = true;
+                    `;
+        const userResults = await client_update.query(userQuery, [email]);
+
+        if (userResult.rows.length === 0) {
+          return res.status(401).json({
+            success: false,
+            message: "User not found or inactive",
+          });
+        }
+
+        const user = userResults.rows[0];
+
+        // Parse device info from user agent
+        const parser = new UAParser(req.headers["user-agent"]);
+        const deviceInfo = {
+          browser: parser.getBrowser(),
+          os: parser.getOS(),
+          device: parser.getDevice(),
+        };
+
+        // Generate tokens
+        const accessToken = authService.generateAccessToken(user);
+        const refreshToken = authService.generateRefreshToken();
+
+        // Create session
+        await authService.createSession(
+          user.user_id,
+          refreshToken,
+          deviceInfo,
+          req.ip
         );
+
+        // Disable used OTP
+        await client_update.query(
+          'UPDATE app."OTP_tracker" SET "OTP_disable" = true WHERE email = $1',
+          [email]
+        );
+
+        // Generate JWT token
+        // const token = jwt.sign(
+        //     {
+        //         user_id: user.user_id,
+        //         email: user.email,
+        //         role: user.role,
+        //         first_name: user.first_name,
+        //         last_name: user.last_name
+        //     },
+        //     process.env.JWT_SECRET,
+        //     { expiresIn: '24h' }
+        // );
 
         // Determine redirect path based on role
         let redirectPath;
@@ -129,10 +171,18 @@ exports.verifyOTP = async (req, res) => {
             redirectPath = "/login";
         }
 
+        // res.cookie('refreshToken', refreshToken, {
+        //     httpOnly: true,
+        //     // secure: process.env.NODE_ENV === 'production',
+        //     // sameSite: 'strict',
+        //     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        // });
+
         return res.status(200).json({
           success: true,
           message: "OTP verified successfully.",
-          token: token,
+          token: accessToken,
+          refreshToken: refreshToken,
           data: {
             email: user.email,
             role: user.role,

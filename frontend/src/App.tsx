@@ -1,3 +1,4 @@
+// import { useEffect } from 'react';
 import { Routes, Route } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import { VerifyOTPPage } from "./pages/VerifyOTPPage";
@@ -10,8 +11,18 @@ import CheckerPage from "@/pages/CheckerPage";
 import { Overview, History, TableRequests } from "@/components/checker";
 import { RowRequestManager } from "./components/admin";
 import { Toaster } from "./components/ui/toaster";
+// import { initializeAuthFromStorage } from '@/store/authStore';
+// import { useTokenRefresh } from '@/hooks/useTokenRefresh';
+
 
 const App: React.FC = () => {
+
+
+  // useEffect(() => {
+  //   // Initialize auth store from localStorage on app start
+  //   initializeAuthFromStorage();
+  // }, []);
+
 
   return (
     <>

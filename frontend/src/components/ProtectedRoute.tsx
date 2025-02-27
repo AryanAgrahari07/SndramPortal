@@ -1,6 +1,7 @@
 import type React from 'react'
 import { Navigate } from 'react-router-dom'
-
+// import { isAuthenticated } from '@/store/authStore'
+import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 interface ProtectedRouteProps {
   children: React.ReactNode
   allowedRoles: string[]
@@ -9,6 +10,13 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('token')
   const userRole = localStorage.getItem('userRole')?.toLowerCase()
+  // const location = useLocation();
+
+  useTokenRefresh();
+
+  // if (!isAuthenticated()) {
+  //   return <Navigate to="/login" state={{ from: location }} replace />;
+  // }
 
   if (!token) {
     return <Navigate to="/" replace />
@@ -16,7 +24,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     // Redirect to appropriate page based on role
-    switch (userRole) {
+    switch (userRole) { 
       case 'admin':
         return <Navigate to="/admin" replace />
       case 'maker':

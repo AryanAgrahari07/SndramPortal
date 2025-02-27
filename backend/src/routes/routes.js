@@ -96,6 +96,18 @@ const {
 
 // const rateLimiter = require("../middleware/rateLimiter");
 
+
+
+const { refreshToken } = require("../controllers/refreshToken/refreshToken.js");
+// const { logout } = require("../controllers/auth/logout.js");
+
+router.post("/refresh-token", refreshToken);
+// router.post("/auth/logout", logout);
+
+
+
+
+
 router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
 // users email data
@@ -108,8 +120,8 @@ router.get("/api/tabledata/:tableName", verifyToken, getTableData);
 router.post("/signup", verifyToken, authorize("admin"), createUser);
 
 //opt auth endpoints
-router.post("/send-otp", otpRequestLimiter, sendOTP);
-router.post("/verify-otp", otpVerificationLimiter, verifyOTP);
+router.post("/send-otp", otpRequestLimiter ,sendOTP);
+router.post("/auth/verify-otp", otpVerificationLimiter,verifyOTP);
 
 // User management routes - Admin only
 router.get("/users", verifyToken, getAllUsers);
