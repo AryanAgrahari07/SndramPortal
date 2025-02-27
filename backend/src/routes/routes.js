@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { verifyToken, authorize } = require("../middleware/auth.js");
 
+const otpRequestLimiter = require("../middleware/otpRequestLimiter");
 // Import controllers
 const {
   createUser,
@@ -89,8 +90,11 @@ const {
   markNotificationsAsSeen,
 } = require("../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js");
 
-// const rateLimiter = require("../middleware/rateLimiter");
+const {
+  otpVerificationLimiter,
+} = require("../middleware/otpVerificationLimiter");
 
+// const rateLimiter = require("../middleware/rateLimiter");
 
 router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
@@ -104,8 +108,8 @@ router.get("/api/tabledata/:tableName", verifyToken, getTableData);
 router.post("/signup", verifyToken, authorize("admin"), createUser);
 
 //opt auth endpoints
-router.post("/send-otp", sendOTP);
-router.post("/verify-otp", verifyOTP);
+router.post("/send-otp", otpRequestLimiter, sendOTP);
+router.post("/verify-otp", otpVerificationLimiter, verifyOTP);
 
 // User management routes - Admin only
 router.get("/users", verifyToken, getAllUsers);
