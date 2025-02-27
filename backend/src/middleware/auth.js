@@ -15,21 +15,35 @@ const verifyToken = async (req, res, next) => {
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            req.user = decoded;
 
-            // Check if user is still active
-            const userQuery = 'SELECT active FROM app.users WHERE user_id = $1';
-            const result = await client_update.query(userQuery, [decoded.user_id]);
+            console.log("decoded data is", decoded);
+            // Check if user has valid session
+            const sessionQuery = `
+                SELECT us.*, u.active 
+                FROM app.user_sessions us
+                JOIN app.users u ON us.user_id = u.user_id
+                WHERE us.user_id = $1 AND us.is_active = true
+                AND us.expires_at > NOW()
+            `;
+            const result = await client_update.query(sessionQuery, [decoded.user_id]);
 
             if (result.rows.length === 0 || !result.rows[0].active) {
-                return res.status(403).json({
+                return res.status(401).json({
                     success: false,
-                    message: 'User is inactive or not found'
+                    message: 'Invalid session'
                 });
             }
 
+            req.user = decoded;
             next();
         } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Token expired',
+                    code: 'TOKEN_EXPIRED'
+                });
+            }
             return res.status(401).json({
                 success: false,
                 message: 'Invalid token'
@@ -44,7 +58,7 @@ const verifyToken = async (req, res, next) => {
     }
 };
 
-// Role-based authentication middleware
+// Role-based authentication middleware (no changes needed)
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {

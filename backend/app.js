@@ -3,9 +3,10 @@ const app = express();
 require("dotenv").config();
 const os = require("os");
 const hostname = os.hostname();
-const { sanitizeInput } = require('./src/middleware/security');
+const { sanitizeInput } = require("./src/middleware/security");
 const cors = require("cors");
 const PORT = process.env.PORT || 4444;
+// const cookieParser = require('cookie-parser');
 
 if (!process.env.FRONTEND) {
   throw new Error("FRONTEND URL not defined in environment variables");
@@ -14,6 +15,8 @@ if (!process.env.FRONTEND) {
 app.use(sanitizeInput); // sanitization middleware
 
 //Middleware
+
+// app.use(cookieParser());
 app.use(
   cors({
     origin: process.env.FRONTEND,
@@ -26,8 +29,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const routesPath = require("./src/routes/routes.js");
 app.use("/", routesPath);
-
-
 
 const {
   databaseUpdateConnection,
