@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/Dialog";
 import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
+import { EXCLUDED_TABLES } from "@/config/tableConfig";
 
 interface TableMetadata {
   id: string;
@@ -90,7 +91,10 @@ const TableConfigurator: React.FC = () => {
       });
       const data = (await response.json()) as TableResponse;
       if (data.success) {
-        setAvailableTables(data.tables.map((t) => t.table_name));
+        const filteredTables = data.tables
+        .map(t => t.table_name)
+        .filter(tableName => !EXCLUDED_TABLES.includes(tableName));
+      setAvailableTables(filteredTables);
       }
     } catch (error) {
       console.log(error);

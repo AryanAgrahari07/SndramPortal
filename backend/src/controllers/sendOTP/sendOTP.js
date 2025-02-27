@@ -60,15 +60,15 @@ async function sendOTPEmail(recipientEmail, otp) {
 exports.sendOTP = async (req, res) => {
     const { email } = req.body;
 
-    if (!email) {
+    if (!email || typeof email !== 'string') {
         return res.status(400).json({
             success: false,
-            message: 'Email is required',
+            message: 'Invalid email format',
         });
     }
 
     // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
     if (!emailRegex.test(email)) {
         return res.status(400).json({
             success: false,
@@ -76,17 +76,19 @@ exports.sendOTP = async (req, res) => {
         });
     }
 
+    // Sanitize email by converting to lowercase and trimming
+    const sanitizedEmail = email.toLowerCase().trim();
+
     try {
         // Begin transaction
         await client_update.query('BEGIN');
 
-        const checkUserQuery = `
-            SELECT email 
-            FROM app."users" 
-            WHERE email = $1
-        `;
+        const checkUserQuery = {
+            text: 'SELECT email FROM app."users" WHERE email = $1',
+            values: [sanitizedEmail]
+        };
 
-        const userExists = await client_update.query(checkUserQuery, [email]);
+        const userExists = await client_update.query(checkUserQuery);
 
         if (userExists.rows.length === 0) {
             await client_update.query('ROLLBACK');
@@ -110,12 +112,15 @@ exports.sendOTP = async (req, res) => {
         );
 
         // Insert new hashed OTP
-        const insertOtpQuery = `
-            INSERT INTO app."OTP_tracker" (email, "OTP", "OTP_disable", created_at)
-            VALUES ($1, $2, false, CURRENT_TIMESTAMP)
-        `;
+        const insertOtpQuery = {
+            text: `
+                INSERT INTO app."OTP_tracker" (email, "OTP", "OTP_disable", created_at)
+                VALUES ($1, $2, false, CURRENT_TIMESTAMP)
+            `,
+            values: [sanitizedEmail, hashedOTP]
+        };
 
-        await client_update.query(insertOtpQuery, [email, hashedOTP]);
+        await client_update.query(insertOtpQuery);
 
         // Send OTP via email
         try {

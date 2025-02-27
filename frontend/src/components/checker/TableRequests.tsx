@@ -29,6 +29,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pagination } from "@/components/Pagination";
 import { ChangesDialog } from "@/components/ChangesDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+
 
 interface ChangeRequest {
   request_id: string;
@@ -68,6 +70,13 @@ export const TableRequests = () => {
   const [selectedChange, setSelectedChange] = useState<ChangeRequest | null>(
     null
   );
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    requestId: '',
+    isBulk: false,
+  });
+
   
 
   const fetchUserEmails = async (userIds: string[]): Promise<Record<string, string>> => {
@@ -143,8 +152,17 @@ export const TableRequests = () => {
     fetchRequests();
   }, [fetchRequests]);
 
+
+  const handleApprove = async (requestId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      requestId: requestId,
+      isBulk: false,
+    });
+  };
+
   // Handle approve/reject actions
-  const handleApprove = async (rowId: string, requestId: string) => {
+  const confirmApprove = async (rowId: string, requestId: string) => {
     try {
       const response = await fetch(`${API_URL}${ENDPOINTS.CHECKER.APPROVE}`, {
         method: "POST",
@@ -213,9 +231,18 @@ export const TableRequests = () => {
     }
   };
 
-  const handleApproveAll = async (rowIds: string[]) => {
+  const handleApproveAll = async () => {
+    setConfirmDialog({
+      isOpen: true,
+      requestId: '',
+      isBulk: true,
+    });
+    
+  };
+
+  const confirmApproveAll = async (rowIds: string[]) => {
     try {
-      const response = await fetch(
+       const response = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.APPROVE_ALL}`,
         {
           method: "POST",
@@ -236,7 +263,7 @@ export const TableRequests = () => {
           description: "All selected requests approved successfully",
         });
         setSelectedRequests([]);
-        fetchRequests();
+        await fetchRequests();
       }
     } catch (error) {
       console.log(error);
@@ -383,7 +410,7 @@ export const TableRequests = () => {
               <Button
                 variant="ghost"
                 className="text-[#00BFA5] hover:bg-[#00BFA5]/10"
-                onClick={() => handleApproveAll(selectedRequests)}
+                onClick={() => handleApproveAll()}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Approve Selected
@@ -451,7 +478,7 @@ export const TableRequests = () => {
                     <div className="flex gap-1 justify-center">
                       <button
                         onClick={() =>
-                          handleApprove(request.row_id, request.request_id)
+                          handleApprove( request.request_id)
                         }
                         className="p-1.5 rounded-full text-[#00BFA5] hover:bg-[#00BFA5]/10"
                       >
@@ -532,6 +559,29 @@ export const TableRequests = () => {
           </TableBody>
         </Table>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, requestId: '', isBulk: false })}
+        onConfirm={() => {
+          if (confirmDialog.isBulk) {
+            confirmApproveAll(selectedRequests);
+          } else {
+            const request = requests.find(r => r.request_id === confirmDialog.requestId);
+            if (request) {
+              confirmApprove(request.row_id, request.request_id);
+            }
+          }
+          setConfirmDialog({ isOpen: false, requestId: '', isBulk: false });
+        }}
+        title={`Confirm ${confirmDialog.isBulk ? 'Bulk ' : ''}Approval`}
+        description={
+          confirmDialog.isBulk
+            ? `Are you sure you want to approve ${selectedRequests.length} selected requests?`
+            : "Are you sure you want to approve this request?"
+        }
+        variant="success"
+      />
 
       <div className="border-t pt-4 mt-auto">
         <Pagination

@@ -11,11 +11,23 @@ export const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    return emailRegex.test(email);
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
+    const sanitizedEmail = email.trim().toLowerCase();
+    if (!validateEmail(sanitizedEmail)) {
+        setError("Please enter a valid email address");
+        return;
+    }
+    
     try {
       const response = await authService.sendOTP(email);
       if (response.success) {

@@ -453,11 +453,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
                     {/* Updated Accept button with confirmation dialog */}
                     <button
                       className="p-1 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
-                      onClick={() => setConfirmDialog({
-                        isOpen: true,
-                        requestId: request.request_id,
-                        isBulk: false
-                      })}
+                      onClick={() => handleAccept(request.request_id)}
                       disabled={isLoading}
                     >
                       <Check className="h-4 w-4" />
@@ -521,11 +517,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
           {/* Updated Bulk Accept button with confirmation dialog */}
           <button
             className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
-            onClick={() => setConfirmDialog({
-              isOpen: true,
-              requestId: '',
-              isBulk: true
-            })}
+            onClick={handleBulkAccept}
             disabled={isLoading}
           >
             Accept Selected ({selectedRequests.length})

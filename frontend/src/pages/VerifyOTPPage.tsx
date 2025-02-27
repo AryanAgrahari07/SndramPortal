@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { useOTPTimer } from "../hooks/useOTPTimer";
 import { config } from "../config/env";
 
+
 interface AuthResponse {
   success: boolean;
   message?: string;
@@ -57,8 +58,26 @@ export const VerifyOTPPage: React.FC = () => {
     }
   };
 
+  const validateInput = (input: string): boolean => {
+    // Validate OTP format (6 digits only)
+    const otpRegex = /^\d{6}$/;
+    return otpRegex.test(input);
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+     // Enhanced input validation
+     if (!validateInput(otp)) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
+     }
+
+     if (!email || !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/.test(email)) {
+        setError("Invalid email format");
+        return;
+     }
+
     if (otp.length !== 6) {
       setError("Please enter a valid 6-digit OTP");
       return;
@@ -111,6 +130,13 @@ export const VerifyOTPPage: React.FC = () => {
     }
   };
 
+  const handleOTPInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+    if (value.length <= 6) {
+        setOtp(value);
+    }
+};
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a237e] via-[#0d47a1] to-[#00bfa5] p-4">
       <div className="bg-white/90 rounded-3xl shadow-2xl p-8 w-full max-w-md backdrop-blur-sm backdrop-filter">
@@ -145,11 +171,9 @@ export const VerifyOTPPage: React.FC = () => {
                 type="text"
                 id="otp"
                 value={otp}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, "");
-                  if (value.length <= 6) setOtp(value);
-                }}
+                onChange={handleOTPInput}
                 maxLength={6}
+                pattern="\d{6}"
                 required
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-transparent text-lg tracking-widest text-center font-mono"
                 placeholder="000000"

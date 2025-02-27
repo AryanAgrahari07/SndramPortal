@@ -6,26 +6,50 @@ require('dotenv').config();
 exports.verifyOTP = async (req, res) => {
     const { email, OTP } = req.body;
 
-    if (!email || !OTP) {
-        return res.status(400).json({
-            success: false,
-            message: 'Email and OTP are required.',
-        });
-    }
+    if (!email || !OTP || typeof email !== 'string' || typeof OTP !== 'string') {
+      return res.status(400).json({
+          success: false,
+          message: 'Invalid email or OTP format',
+      });
+  }
+
+     // Validating email format
+     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+     if (!emailRegex.test(email)) {
+         return res.status(400).json({
+             success: false,
+             message: 'Invalid email format',
+         });
+     }
+ 
+     // Validating OTP format (6 digits only)
+     const otpRegex = /^\d{6}$/;
+     if (!otpRegex.test(OTP)) {
+         return res.status(400).json({
+             success: false,
+             message: 'Invalid OTP format',
+         });
+     }
+ 
+     // Sanitizing inputs
+     const sanitizedEmail = email.toLowerCase().trim();
 
     try {
         // Begin a transaction
         await client_update.query('BEGIN');
 
         // First check if user is active
-        const userQuery = `
-            SELECT user_id, email, role, first_name, last_name, active
-            FROM app."users"
-            WHERE email = $1
-            LIMIT 1;
-        `;
+        const userQuery = {
+          text: `
+              SELECT user_id, email, role, first_name, last_name, active
+              FROM app."users"
+              WHERE email = $1
+              LIMIT 1
+          `,
+          values: [sanitizedEmail]
+           };
 
-        const userResult = await client_update.query(userQuery, [email]);
+        const userResult = await client_update.query(userQuery);
 
         if (userResult.rows.length === 0) {
             await client_update.query('ROLLBACK');

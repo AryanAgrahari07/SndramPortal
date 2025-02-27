@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
+import { EXCLUDED_TABLES } from "@/config/tableConfig";
 
 interface TableGroup {
   group_id: string;
@@ -90,10 +91,11 @@ const GroupConfiguration: React.FC = () => {
       });
       const data = await response.json();
       if (data.success) {
-        const tableNames = data.tables.map(
-          (table: { table_name: string }) => table.table_name
-        );
-        setAvailableTables(tableNames);
+        const filteredTables = data.tables
+          .map((table: { table_name: string }) => table.table_name)
+          .filter((tableName: string) => !EXCLUDED_TABLES.includes(tableName));
+          
+        setAvailableTables(filteredTables);
       } else {
         throw new Error(data.message || "Failed to fetch tables");
       }

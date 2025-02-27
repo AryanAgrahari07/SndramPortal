@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, X, Table, Database, List } from "lucide-react";
 import logo from "@/assets/images/select-table.svg";
+import { EXCLUDED_TABLES } from "@/config/tableConfig";
 
 interface DropdownOption {
   value: string;
@@ -80,8 +81,10 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
 
       const data = (await response.json()) as TableResponse;
       if (data.success) {
-        const tableNames = data.tables.map((table) => table.table_name);
-        setTables(tableNames);
+        const filteredTables = data.tables
+        .map((t: { table_name: string }) => t.table_name)
+        .filter((tableName: string) => !EXCLUDED_TABLES.includes(tableName));
+      setTables(filteredTables);
       } else {
         throw new Error(data.message || "Failed to fetch tables");
       }
