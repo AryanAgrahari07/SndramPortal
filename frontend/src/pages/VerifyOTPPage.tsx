@@ -5,12 +5,15 @@ import { authService } from "../services/authService";
 import { Loader2 } from "lucide-react";
 import { useOTPTimer } from "../hooks/useOTPTimer";
 import { config } from "../config/env";
+import { useAuthStore } from "@/store/authStore";
+
 
 
 interface AuthResponse {
   success: boolean;
   message?: string;
   token?: string;
+  refreshToken?: string;
   data?: {
     email: string;
     role: string;
@@ -19,6 +22,7 @@ interface AuthResponse {
   };
   redirectPath?: string;
 }
+
 
 export const VerifyOTPPage: React.FC = () => {
   const [otp, setOtp] = useState("");
@@ -30,6 +34,7 @@ export const VerifyOTPPage: React.FC = () => {
   const { timeLeft, startTimer, isActive } = useOTPTimer(
     config.otpExpirySeconds
   );
+  const { setTokens, setUser } = useAuthStore();
 
   useEffect(() => {
     if (!email) {
@@ -97,8 +102,18 @@ export const VerifyOTPPage: React.FC = () => {
         otp
       )) as AuthResponse;
       if (response.success && response.token && response.data) {
+
+        setTokens(response.token, response.refreshToken || "");
+         setUser({
+          email: response.data.email,
+          role: response.data.role,
+          first_name: response.data.first_name,
+          last_name: response.data.last_name
+        });
+
         // Store user data in localStorage
         localStorage.setItem("token", response.token);
+        localStorage.setItem("refreshToken", response.refreshToken || "");
         localStorage.setItem("userRole", response.data.role.toLowerCase());
         localStorage.setItem("userEmail", response.data.email);
         localStorage.setItem("firstName", response.data.first_name);
@@ -108,16 +123,16 @@ export const VerifyOTPPage: React.FC = () => {
         const role = response.data.role.toLowerCase();
         switch (role) {
           case "admin":
-            navigate("/admin");
+            navigate("/admin" , { replace: true });
             break;
           case "maker":
-            navigate("/dashboard");
+            navigate("/dashboard" , { replace: true });
             break;
           case "checker":
-            navigate("/checker");
+            navigate("/checker" , { replace: true });
             break;
           default:
-            navigate("/login");
+            navigate("/" , { replace: true });
         }
       } else {
         setError(response.message || "Invalid OTP. Please try again.");
