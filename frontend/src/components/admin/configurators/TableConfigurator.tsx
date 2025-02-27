@@ -15,6 +15,7 @@ import {
 import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface TableMetadata {
   id: string;
@@ -45,6 +46,52 @@ const TableConfigurator: React.FC = () => {
     display_name: "",
     description: "",
   });
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    tableId: "",
+    tableName: "",
+  });
+
+  const handleDelete = (table: TableMetadata) => {
+    setConfirmDialog({
+      isOpen: true,
+      tableId: table.id,
+      tableName: table.display_name
+    });
+  };
+
+  const confirmDelete = async (id: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:8080/delete-renamed-tables/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: `${confirmDialog.tableName} deleted successfully`,
+        });
+        fetchTables();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      console.log(error);
+      toast({
+        title: "Error",
+        description: "Failed to delete table configuration",
+        variant: "destructive",
+      });
+    }
+  };
 
   const totalPages = Math.ceil(tables.length / ITEMS_PER_PAGE);
   const paginatedTables = tables.slice(
@@ -92,9 +139,9 @@ const TableConfigurator: React.FC = () => {
       const data = (await response.json()) as TableResponse;
       if (data.success) {
         const filteredTables = data.tables
-        .map(t => t.table_name)
-        .filter(tableName => !EXCLUDED_TABLES.includes(tableName));
-      setAvailableTables(filteredTables);
+          .map((t) => t.table_name)
+          .filter((tableName) => !EXCLUDED_TABLES.includes(tableName));
+        setAvailableTables(filteredTables);
       }
     } catch (error) {
       console.log(error);
@@ -142,39 +189,6 @@ const TableConfigurator: React.FC = () => {
         title: "Error",
         description:
           error instanceof Error ? error.message : "Operation failed",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        `http://localhost:8080/delete-renamed-tables/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Table configuration deleted successfully",
-        });
-        fetchTables();
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (error) {
-      console.log(error);
-      toast({
-        title: "Error",
-        description: "Failed to delete table configuration",
         variant: "destructive",
       });
     }
@@ -261,7 +275,7 @@ const TableConfigurator: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(table.id)}
+                    onClick={() => handleDelete(table)}
                     className="text-red-600 hover:text-red-700"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -283,25 +297,38 @@ const TableConfigurator: React.FC = () => {
         </>
       )}
 
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, tableId: "", tableName: "" })}
+        onConfirm={() => {
+          confirmDelete(confirmDialog.tableId);
+          setConfirmDialog({ isOpen: false, tableId: "", tableName: "" });
+        }}
+        title="Confirm Deletion"
+        description="Are you sure you want to delete this table configuration? This action cannot be undone."
+      />
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="text-xl font-semibold text-[#0F172A]">
               {selectedTable ? "Edit Table" : "Add New Table"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm text-gray-500 mt-1.5">
               {selectedTable
                 ? "Update the display name and description for this table"
                 : "Configure a new table display name and description"}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 px-6 py-4">
             {!selectedTable && (
               <div className="space-y-2">
-                <Label>Original Table Name</Label>
+                <Label className="text-sm font-medium text-gray-700">
+                  Original Table Name
+                </Label>
                 <select
-                  className="w-full rounded-md border border-gray-200 p-2"
+                  className="w-full rounded-md border border-gray-200 p-2.5 focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10 bg-white text-sm"
                   value={formData.original_table_name}
                   onChange={(e) =>
                     setFormData({
@@ -310,7 +337,9 @@ const TableConfigurator: React.FC = () => {
                     })
                   }
                 >
-                  <option value="">Select a table</option>
+                  <option value="" className="text-gray-500">
+                    Select a table
+                  </option>
                   {availableTables.map((table) => (
                     <option key={table} value={table}>
                       {table}
@@ -321,44 +350,60 @@ const TableConfigurator: React.FC = () => {
             )}
 
             <div className="space-y-2">
-              <Label>Display Name</Label>
+              <Label className="text-sm font-medium text-gray-700">
+                Display Name
+              </Label>
               <Input
                 value={formData.display_name}
                 onChange={(e) =>
                   setFormData({ ...formData, display_name: e.target.value })
                 }
                 placeholder="Enter display name"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Description (Optional)</Label>
+              <Label className="text-sm font-medium text-gray-700">
+                Description
+                <span className="text-gray-400 ml-1 font-normal">
+                  (Optional)
+                </span>
+              </Label>
               <Input
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
                 placeholder="Enter description"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDialogOpen(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
-            >
-              {selectedTable ? "Update" : "Add"} Table
-            </Button>
+          <DialogFooter className="px-6 py-4 bg-gray-50 border-t">
+            <div className="flex gap-3 justify-end w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#0F172A] hover:bg-[#0F172A]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]"
+                disabled={
+                  !formData.display_name ||
+                  (!selectedTable && !formData.original_table_name)
+                }
+              >
+                {selectedTable ? "Update" : "Add"} Table
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

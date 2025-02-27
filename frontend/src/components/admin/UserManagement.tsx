@@ -64,35 +64,39 @@ const UserManagement: React.FC = () => {
   const paginatedUsers = users.slice(startIndex, endIndex);
 
   // Load users from backend
-  const loadUsers = useCallback(async (query: string) => {
-    try {
-      const response = await getAllUsers(query);
-      if (response.success) {
-        const transformedUsers = response.data.map((user: UserApiResponse) => ({
-          id: user.user_id,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          email: user.email,
-          role: user.role,
-          isDisabled: !user.active, // When active is false in DB, user is disabled
-        }));
-        setUsers(transformedUsers);
+  const loadUsers = useCallback(
+    async (query: string) => {
+      try {
+        const response = await getAllUsers(query);
+        if (response.success) {
+          const transformedUsers = response.data.map(
+            (user: UserApiResponse) => ({
+              id: user.user_id,
+              firstName: user.first_name,
+              lastName: user.last_name,
+              email: user.email,
+              role: user.role,
+              isDisabled: !user.active, // When active is false in DB, user is disabled
+            })
+          );
+          setUsers(transformedUsers);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to load users";
+        toast({
+          title: "Error",
+          description: errorMessage,
+          className: "bg-[#003087] text-white border-none",
+        });
       }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load users";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        className: "bg-[#003087] text-white border-none",
-      });
-    }
-  }, [toast]);
+    },
+    [toast]
+  );
 
   useEffect(() => {
     loadUsers(searchQuery);
   }, [loadUsers]);
-
 
   const handleSearch = () => {
     loadUsers(searchQuery); // Fetch users based on search query
@@ -308,31 +312,31 @@ const UserManagement: React.FC = () => {
         </h1>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center ">
-        {/* Search Input */}
-           <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <Input
-                value={searchQuery}
-                placeholder="Search by name or email..."
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-           </div>
+          {/* Search Input */}
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <Input
+              value={searchQuery}
+              placeholder="Search by name or email..."
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
 
-            <div className="flex space-x-2">
-                <Button
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-400 transition-colors"
-                  onClick={handleclear}
-                >
-                  Clear
-                </Button>
-                <Button
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors"
-                  onClick={handleSearch}
-                >
-                  Search
-                </Button>
-            </div>
+          <div className="flex space-x-2">
+            <Button
+              className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-400 transition-colors"
+              onClick={handleclear}
+            >
+              Clear
+            </Button>
+            <Button
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors"
+              onClick={handleSearch}
+            >
+              Search
+            </Button>
+          </div>
         </div>
 
         <Button
@@ -437,15 +441,16 @@ const UserManagement: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-
               </tbody>
             </table>
 
-                {paginatedUsers.length === 0 && (
-                      <div className="flex justify-center items-center h-32">
-                      <p className="text-gray-500 text-lg font-semibold">No users found</p>
-                      </div>
-                )}
+            {paginatedUsers.length === 0 && (
+              <div className="flex justify-center items-center h-32">
+                <p className="text-gray-500 text-lg font-semibold">
+                  No users found
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="px-6 py-4 bg-white border-t border-gray-200">
@@ -519,7 +524,7 @@ const UserManagement: React.FC = () => {
                 <div className="space-y-2">
                   <Select
                     value={newUser.role}
-                    onValueChange={(value: "maker" | "checker") =>
+                    onValueChange={(value: "maker" | "checker" | "admin") =>
                       setNewUser((prev) => ({ ...prev, role: value }))
                     }
                   >
@@ -529,6 +534,7 @@ const UserManagement: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="maker">Maker</SelectItem>
                       <SelectItem value="checker">Checker</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -639,7 +645,7 @@ const UserManagement: React.FC = () => {
                 </label>
                 <Select
                   value={editingUser?.role || ""}
-                  onValueChange={(value: "maker" | "checker") =>
+                  onValueChange={(value: "maker" | "checker" | "admin") =>
                     setEditingUser((prev) =>
                       prev ? { ...prev, role: value } : null
                     )
@@ -651,6 +657,7 @@ const UserManagement: React.FC = () => {
                   <SelectContent className="bg-white font-poppins">
                     <SelectItem value="maker">Maker</SelectItem>
                     <SelectItem value="checker">Checker</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -685,63 +692,106 @@ const UserManagement: React.FC = () => {
           }))
         }
       >
-        <DialogContent className="bg-white font-poppins p-4 relative">
-          <button
-            onClick={() =>
-              setDialogState((prev) => ({
-                ...prev,
-                disable: { open: false, user: null },
-              }))
-            }
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-          <DialogHeader>
-            <DialogTitle className="font-poppins">
-              {dialogState.disable.user?.isDisabled
-                ? "Enable User"
-                : "Disable User"}
-            </DialogTitle>
-            <DialogDescription className="font-poppins">
-              Are you sure you want to{" "}
-              {dialogState.disable.user?.isDisabled ? "enable" : "disable"}{" "}
-              {dialogState.disable.user?.firstName}{" "}
-              {dialogState.disable.user?.lastName}?
-              {!dialogState.disable.user?.isDisabled && (
-                <p className="mt-2 text-sm text-gray-500">
-                  This user will no longer be able to access the system until
-                  re-enabled.
-                </p>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setDialogState((prev) => ({
-                  ...prev,
-                  disable: { open: false, user: null },
-                }))
-              }
-              className="font-poppins"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant={
-                dialogState.disable.user?.isDisabled ? "default" : "destructive"
-              }
-              onClick={confirmToggleUserActive}
-              className="font-poppins"
-            >
-              {dialogState.disable.user?.isDisabled
-                ? "Enable User"
-                : "Disable User"}
-            </Button>
-          </DialogFooter>
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
+          <div className="flex flex-col gap-0">
+            {/* Header Section */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex flex-col gap-1">
+                  <DialogTitle className="text-xl font-semibold text-[#0F172A]">
+                    {dialogState.disable.user?.isDisabled
+                      ? "Enable User"
+                      : "Disable User"}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-gray-500">
+                    {dialogState.disable.user?.isDisabled
+                      ? "This action will restore user access to the system."
+                      : "This action will revoke user access to the system."}
+                  </DialogDescription>
+                </div>
+                <button
+                  onClick={() =>
+                    setDialogState((prev) => ({
+                      ...prev,
+                      disable: { open: false, user: null },
+                    }))
+                  }
+                  className="rounded-md p-1.5 hover:bg-gray-100 transition-colors"
+                >
+                  <X className="h-4 w-4 text-gray-500" />
+                  <span className="sr-only">Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Content Section */}
+            <div className="px-6 py-4 bg-gray-50 border-y border-gray-100">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  {dialogState.disable.user?.isDisabled ? (
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <Eye className="h-5 w-5 text-green-600" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <Ban className="h-5 w-5 text-red-600" />
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-medium text-[#0F172A]">
+                      {dialogState.disable.user?.firstName}{" "}
+                      {dialogState.disable.user?.lastName}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {dialogState.disable.user?.email}
+                    </span>
+                  </div>
+                </div>
+
+                {!dialogState.disable.user?.isDisabled && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-100 rounded-md">
+                    <p className="text-sm text-amber-800">
+                      This user will no longer be able to access the system
+                      until re-enabled. All active sessions will be terminated.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Section */}
+            <div className="px-6 py-4 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setDialogState((prev) => ({
+                    ...prev,
+                    disable: { open: false, user: null },
+                  }))
+                }
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant={
+                  dialogState.disable.user?.isDisabled
+                    ? "default"
+                    : "destructive"
+                }
+                onClick={confirmToggleUserActive}
+                className={`px-4 py-2 text-sm font-medium ${
+                  dialogState.disable.user?.isDisabled
+                    ? "bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white"
+                }`}
+              >
+                {dialogState.disable.user?.isDisabled
+                  ? "Enable User"
+                  : "Disable User"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

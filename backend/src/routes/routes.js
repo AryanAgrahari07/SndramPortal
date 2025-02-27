@@ -89,6 +89,7 @@ const {
   markNotificationsAsSeen,
 } = require("../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js");
 
+// const rateLimiter = require("../middleware/rateLimiter");
 
 
 router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);

@@ -3,17 +3,14 @@ const app = express();
 require("dotenv").config();
 const os = require("os");
 const hostname = os.hostname();
-const { securityMiddleware, sanitizeInput } = require('./src/middleware/security');
+const { sanitizeInput } = require('./src/middleware/security');
 const cors = require("cors");
-const rateLimiter = require('./src/middleware/rateLimiter');
 const PORT = process.env.PORT || 4444;
 
 if (!process.env.FRONTEND) {
   throw new Error("FRONTEND URL not defined in environment variables");
 }
 
-// securityMiddleware(app);  // security middleware
-app.use(rateLimiter);
 app.use(sanitizeInput); // sanitization middleware
 
 //Middleware

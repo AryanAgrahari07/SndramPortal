@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface TableGroup {
   group_id: string;
@@ -41,6 +42,11 @@ const GroupConfiguration: React.FC = () => {
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [availableTables, setAvailableTables] = useState<string[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    groupId: "",
+    groupName: "",
+  });
 
   useEffect(() => {
     fetchGroups();
@@ -94,7 +100,7 @@ const GroupConfiguration: React.FC = () => {
         const filteredTables = data.tables
           .map((table: { table_name: string }) => table.table_name)
           .filter((tableName: string) => !EXCLUDED_TABLES.includes(tableName));
-          
+
         setAvailableTables(filteredTables);
       } else {
         throw new Error(data.message || "Failed to fetch tables");
@@ -205,7 +211,15 @@ const GroupConfiguration: React.FC = () => {
     }
   };
 
-  const handleDeleteGroup = async (group: TableGroup) => {
+  const handleDeleteGroup = (group: TableGroup) => {
+    setConfirmDialog({
+      isOpen: true,
+      groupId: group.group_name,
+      groupName: group.group_name,
+    });
+  };
+
+  const confirmDeleteGroup = async (groupName: string) => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -215,7 +229,7 @@ const GroupConfiguration: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ group_name: group.group_name }),
+        body: JSON.stringify({ group_name: groupName }),
       });
 
       const data = await response.json();
@@ -223,7 +237,7 @@ const GroupConfiguration: React.FC = () => {
         await fetchGroups();
         toast({
           title: "Success",
-          description: "Group deleted successfully",
+          description: `${groupName} deleted successfully`,
         });
       } else {
         throw new Error(data.message || "Failed to delete group");
@@ -394,55 +408,101 @@ const GroupConfiguration: React.FC = () => {
           </div>
         )}
 
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() =>
+            setConfirmDialog({ isOpen: false, groupId: "", groupName: "" })
+          }
+          onConfirm={() => {
+            confirmDeleteGroup(confirmDialog.groupId);
+            setConfirmDialog({ isOpen: false, groupId: "", groupName: "" });
+          }}
+          title="Confirm Deletion"
+          description={`Are you sure you want to delete "${confirmDialog.groupName}"? This action cannot be undone.`}
+        />
+
         {/* Create Group Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="bg-white p-6">
-            <DialogHeader>
-              <DialogTitle>Create New Group</DialogTitle>
-              <DialogDescription>
-                Enter a name for the new group to manage table permissions.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Group Name</Label>
-                <Input
-                  placeholder="Enter group name"
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  className="border-gray-200 focus:ring-[#0F172A] focus:border-[#0F172A]"
-                />
+          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
+            <div className="flex flex-col gap-0">
+              {/* Header Section */}
+              <div className="px-6 pt-6 pb-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex flex-col gap-1">
+                    <DialogTitle className="text-xl font-semibold text-[#0F172A]">
+                      Create New Group
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-gray-500">
+                      Enter a name for the new group to manage table
+                      permissions.
+                    </DialogDescription>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsCreateDialogOpen(false);
+                      setNewGroupName("");
+                    }}
+                    className="rounded-md p-1.5 hover:bg-gray-100 transition-colors"
+                  >
+                    {/* <X className="h-4 w-4 text-gray-500" /> */}
+                    <span className="sr-only">Close</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content Section */}
+              <div className="px-6 py-4 bg-gray-50 border-y border-gray-100">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Group Name
+                    </Label>
+                    <Input
+                      placeholder="Enter group name"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      className="w-full p-2.5 rounded-md border border-gray-200 focus:ring-2 focus:ring-[#0F172A]/10 focus:border-[#0F172A] bg-white"
+                    />
+                  </div>
+
+                  {/* Optional: Add helper text */}
+                  <p className="text-sm text-gray-500">
+                    Group name should be unique and descriptive.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer Section */}
+              <div className="px-6 py-4 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setNewGroupName("");
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateGroup}
+                  disabled={isLoading || !newGroupName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#0F172A] hover:bg-[#0F172A]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Creating...</span>
+                    </div>
+                  ) : (
+                    "Create Group"
+                  )}
+                </Button>
               </div>
             </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreateDialogOpen(false);
-                  setNewGroupName("");
-                }}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateGroup}
-                className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    <span>Creating...</span>
-                  </div>
-                ) : (
-                  "Create Group"
-                )}
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
-
         {/* Add Tables Dialog */}
         <Dialog
           open={isAddTablesDialogOpen}
