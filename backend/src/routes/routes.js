@@ -122,8 +122,6 @@ router.post("/signup", verifyToken, authorize("admin"), createUser);
 //opt auth endpoints
 router.post("/send-otp", otpRequestLimiter ,sendOTP);
 router.post("/auth/verify-otp", otpVerificationLimiter,verifyOTP);
-// router.post("/send-otp" ,sendOTP);
-// router.post("/auth/verify-otp",verifyOTP);
 
 // User management routes - Admin only
 router.get("/users", verifyToken, getAllUsers);

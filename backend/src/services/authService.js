@@ -15,14 +15,14 @@ class AuthService {
         role: user.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1m" } // Short expiry for security
+      { expiresIn: "5m" } // Short expiry for security
     );
   }
 
   // Generate refresh token (long-lived)
   generateRefreshToken() {
     return jwt.sign({ token_id: uuidv4() }, process.env.JWT_REFRESH_SECRET, {
-      expiresIn: "2m",
+      expiresIn: "20m",
     });
   }
 

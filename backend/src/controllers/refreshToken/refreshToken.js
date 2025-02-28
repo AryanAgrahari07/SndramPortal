@@ -29,7 +29,7 @@ exports.refreshToken = async (req, res) => {
         role: session.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1m" } // Set appropriate expiration time
+      { expiresIn: "5m" } // Set appropriate expiration time
     );
 
     const newRefreshToken = authService.generateRefreshToken();
