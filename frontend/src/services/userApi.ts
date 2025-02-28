@@ -60,6 +60,7 @@ export const createUser = async (userData: User) => {
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     return response.data;
@@ -76,6 +77,7 @@ export const getAllUsers = async (searchQuery: string) => {
     const response = await axios.get(`${API_BASE_URL}/users`, {
       headers: getAuthHeaders(),
       params: { searchQuery },
+      withCredentials: true,
     });
     return response.data;
   } catch (error) {
@@ -99,6 +101,7 @@ export const updateUser = async (userId: string, userData: Partial<User>) => {
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     return response.data;
@@ -115,7 +118,7 @@ export const toggleUserActive = async (email: string) => {
     const response = await axios.post(
       `${API_BASE_URL}/isactive`,
       { email },
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), withCredentials: true }
     );
     return response.data;
   } catch (error) {
@@ -134,7 +137,8 @@ export const getHighlightedCells = async (
       `${API_BASE_URL}/highlight-cells`,
       { tableName },
       {
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(), 
+        withCredentials: true,
       }
     );
 

@@ -139,6 +139,7 @@ export const fetchTableData = async (
     const response = await fetch(
       `${API_URL}/api/tableData/${tableName}?${queryParams.toString()}`,
       {
+        credentials: "include",
         headers: getAuthHeaders(),
       }
     );
@@ -210,6 +211,7 @@ export const requestRowEdit = async (
   try {
     const response = await fetch(`${API_URL}${ENDPOINTS.TABLE.REQUEST_DATA}`, {
       method: "POST",
+      credentials: "include",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -241,8 +243,10 @@ export const addTableRow = async (
         table_name: tableName,
         row_data: rowData,
       },
+
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
 
@@ -268,6 +272,7 @@ export const fetchDropdownOptions = async (
       `${API_URL}${ENDPOINTS.TABLE.FETCH_DROPDOWN_OPTIONS}`,
       {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,

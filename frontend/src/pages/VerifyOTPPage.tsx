@@ -13,7 +13,6 @@ interface AuthResponse {
   success: boolean;
   message?: string;
   token?: string;
-  refreshToken?: string;
   data?: {
     email: string;
     role: string;
@@ -103,17 +102,16 @@ export const VerifyOTPPage: React.FC = () => {
       )) as AuthResponse;
       if (response.success && response.token && response.data) {
 
-        setTokens(response.token, response.refreshToken || "");
+         setTokens(response.token);
          setUser({
           email: response.data.email,
           role: response.data.role,
           first_name: response.data.first_name,
           last_name: response.data.last_name
-        });
+          });
 
         // Store user data in localStorage
         localStorage.setItem("token", response.token);
-        localStorage.setItem("refreshToken", response.refreshToken || "");
         localStorage.setItem("userRole", response.data.role.toLowerCase());
         localStorage.setItem("userEmail", response.data.email);
         localStorage.setItem("firstName", response.data.first_name);

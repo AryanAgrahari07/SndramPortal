@@ -58,7 +58,7 @@ export const columnConfigService = {
     try {
       const response = await axios.get<TableResponse>(
         `${config.apiBaseUrl}/table`,
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true }
       );
       return response.data;
     } catch (error) {
@@ -71,7 +71,7 @@ export const columnConfigService = {
       const response = await axios.post<ColumnResponse>(
         `${config.apiBaseUrl}/fetchcolumn`,
         { table_name: tableName },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true }
       );
       return response.data;
     } catch (error) {
@@ -87,7 +87,7 @@ export const columnConfigService = {
           table_name: tableName,
           action: 'get',
         },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true }
       );
       return response.data;
     } catch (error) {
@@ -107,7 +107,7 @@ export const columnConfigService = {
           column_list: columns,
           action: 'update',
         },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true }
       );
       return response.data;
     } catch (error) {

@@ -16,6 +16,7 @@ export const fetchCheckerRequests = async (
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
+      withCredentials: true,
     }
   );
   return response.data;

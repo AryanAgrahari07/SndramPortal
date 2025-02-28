@@ -82,6 +82,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/table", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -113,6 +114,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
 
       const columnResponse = await fetch("http://localhost:8080/fetchcolumn", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -135,6 +137,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
         "http://localhost:8080/ColumnPermission",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -197,6 +200,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
 
       const response = await fetch("http://localhost:8080/ColumnPermission", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

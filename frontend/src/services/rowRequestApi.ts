@@ -12,6 +12,7 @@ export const rowRequestApi = {
 
     const response = await fetch(`${BASE_URL}/fetchrowrequest`, {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -38,6 +39,7 @@ export const rowRequestApi = {
 
     const response = await fetch(`${BASE_URL}/approverowrequest`, {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -63,6 +65,7 @@ export const rowRequestApi = {
 
     const response = await fetch(`${BASE_URL}/rejectrowrequest`, {
       method: 'POST',
+      credentials: "include", 
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -88,6 +91,7 @@ export const rowRequestApi = {
 
     const response = await fetch(`${BASE_URL}/bulkapproverowrequest`, {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -113,6 +117,7 @@ export const rowRequestApi = {
 
     const response = await fetch(`${BASE_URL}/bulkrejectrowrequest`, {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,

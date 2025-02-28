@@ -57,6 +57,7 @@ export const TablesPage: React.FC = () => {
   const fetchGroups = async () => {
     try {
       const response = await fetch(`${API_URL}/getgrouplist`, {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -82,6 +83,7 @@ export const TablesPage: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/get-renamed-tables`, {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },

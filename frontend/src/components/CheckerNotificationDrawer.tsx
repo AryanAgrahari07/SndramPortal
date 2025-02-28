@@ -53,6 +53,7 @@ export function CheckerNotificationDrawer({
         const response = await fetch(
           "http://localhost:8080/checker-notification",
           {
+            credentials: "include",
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",

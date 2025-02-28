@@ -84,6 +84,7 @@ export const TableRequests = () => {
     try {
         const response = await fetch(`${API_URL}/users/emails`, {
             method: "POST",
+            credentials: "include",
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("token")}`,
                 "Content-Type": "application/json",
@@ -111,6 +112,7 @@ export const TableRequests = () => {
       const response = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.GET_REQUESTS}`,
         {
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
@@ -166,6 +168,7 @@ export const TableRequests = () => {
     try {
       const response = await fetch(`${API_URL}${ENDPOINTS.CHECKER.APPROVE}`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -199,7 +202,8 @@ export const TableRequests = () => {
 
     try {
       const response = await fetch(`${API_URL}${ENDPOINTS.CHECKER.REJECT}`, {
-        method: "POST",
+        method: "POST", 
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -246,6 +250,7 @@ export const TableRequests = () => {
         `${API_URL}${ENDPOINTS.CHECKER.APPROVE_ALL}`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -287,6 +292,7 @@ export const TableRequests = () => {
         `${API_URL}${ENDPOINTS.CHECKER.REJECT_ALL}`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,

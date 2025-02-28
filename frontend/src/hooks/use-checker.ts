@@ -26,6 +26,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
         setIsLoading(true);
         const response = await fetch("http://localhost:8080/approve", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -70,6 +71,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
         setIsLoading(true);
         const response = await fetch("http://localhost:8080/reject", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -108,6 +110,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
         setIsLoading(true);
         const response = await fetch("http://localhost:8080/allApprove", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -148,6 +151,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
         setIsLoading(true);
         const response = await fetch("http://localhost:8080/allReject", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,

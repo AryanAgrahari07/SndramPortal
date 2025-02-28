@@ -16,6 +16,7 @@ export const fetchTables = async (): Promise<TableResponse> => {
   try {
     const response = await fetch(`${config.apiBaseUrl}/table`, {
       method: 'GET',
+      credentials: "include",
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'

@@ -34,6 +34,7 @@ export const fetchDropdownOptions = async (
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
 

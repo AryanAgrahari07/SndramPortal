@@ -74,6 +74,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/table", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -106,6 +107,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/fetchcolumn", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -142,6 +144,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         "http://localhost:8080/fetchColumnDropDown",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -226,6 +229,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         "http://localhost:8080/fetchColumnDropDown",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -263,6 +267,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         "http://localhost:8080/updateColumnDropDown",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,

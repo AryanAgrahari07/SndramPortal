@@ -31,6 +31,7 @@ export const useColumnPermissions = (tableName: string) => {
       try {
         const response = await fetch(`${config.apiBaseUrl}/fetchColumnStatus`, {
           method: "POST",
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

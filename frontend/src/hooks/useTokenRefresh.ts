@@ -6,9 +6,21 @@ import { API_URL } from "@/config/constants";
 const REFRESH_BUFFER_TIME = 20; // seconds before expiry to refresh
 const CHECK_INTERVAL = 10; // check every 5 seconds
 
+export const checkSession = async (accessToken: string | null) => {
+  const response = await fetch("/check-session", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: "include", // Include cookies for session-based auth
+    cache: "no-store",
+  });
+  return response.ok;
+};
+
 export const useTokenRefresh = () => {
   const navigate = useNavigate();
-  const { accessToken, refreshToken, setTokens, clearAuth } = useAuthStore();
+  const { accessToken, setTokens, clearAuth } = useAuthStore();
 
   useEffect(() => {
     // Function to decode JWT and get expiration time
@@ -48,41 +60,30 @@ export const useTokenRefresh = () => {
     // Function to refresh the token
     const refreshAccessToken = async (): Promise<boolean> => {
       try {
-        // Check if refresh token is expired
-        if (refreshToken && isTokenExpired(refreshToken)) {
-          console.log("Refresh token expired");
-          clearAuth();
-          navigate("/login");
-          return false;
-        }
-        // console.log(refreshToken);
-        // console.log(accessToken);
-
+    
         const response = await fetch(`${API_URL}/refresh-token`, {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${refreshToken}`,
+            Authorization: `Bearer`,
           },
         });
 
         if (!response.ok) {
+          // console.log("Refresh token expired");
+          clearAuth();
+          navigate("/login");
           throw new Error("Failed to refresh token");
+        }
+        else{
+          console.log("Token refreshed successfully");
         }
 
         const data = await response.json();
         if (data.success) {
-          //   console.log(" refresh token data is", data);
-          console.log("Token refreshed successfully");
-          //   setTokens(data.accessToken, refreshToken || "");
-          setTokens(data.token, data.refreshToken);
+          setTokens(data.token);
           localStorage.setItem("token", data.token);
-          localStorage.setItem("refreshToken", data.refreshToken);
-
-          //   localStorage.setItem("token", data.accessToken);
-          //   console.log(data.token);
-          //   console.log(data.refreshToken);
-          //   console.log(localStorage.getItem("userRole"));
 
           return true;
         }
@@ -95,7 +96,7 @@ export const useTokenRefresh = () => {
 
     // Main token check and refresh logic
     const checkAndRefreshToken = async () => {
-      if (!accessToken || !refreshToken) {
+      if (!accessToken ) {
         return;
       }
 
@@ -124,5 +125,5 @@ export const useTokenRefresh = () => {
     const intervalId = setInterval(checkAndRefreshToken, CHECK_INTERVAL * 1000);
 
     return () => clearInterval(intervalId);
-  }, [accessToken, refreshToken, setTokens, clearAuth, navigate]);
+  }, [accessToken, setTokens, clearAuth, navigate]);
 };

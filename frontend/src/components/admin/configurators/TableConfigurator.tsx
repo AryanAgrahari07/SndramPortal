@@ -67,6 +67,7 @@ const TableConfigurator: React.FC = () => {
         `http://localhost:8080/delete-renamed-tables/${id}`,
         {
           method: "DELETE",
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -108,6 +109,7 @@ const TableConfigurator: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/get-renamed-tables", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -132,6 +134,7 @@ const TableConfigurator: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/table", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -163,6 +166,7 @@ const TableConfigurator: React.FC = () => {
 
       const response = await fetch(endpoint, {
         method,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

@@ -58,6 +58,7 @@ const GroupConfiguration: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/getGroupList", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -91,6 +92,7 @@ const GroupConfiguration: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/table", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -131,6 +133,7 @@ const GroupConfiguration: React.FC = () => {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/addGroup", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -177,6 +180,7 @@ const GroupConfiguration: React.FC = () => {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/addtable", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -225,6 +229,7 @@ const GroupConfiguration: React.FC = () => {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/removeGroup", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -260,6 +265,7 @@ const GroupConfiguration: React.FC = () => {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/removeTable", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

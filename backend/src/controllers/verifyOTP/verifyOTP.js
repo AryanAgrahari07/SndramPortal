@@ -6,6 +6,7 @@ const UAParser = require("ua-parser-js");
 const jwt = require("jsonwebtoken");
 const authService = require("../../services/authService.js");
 require("dotenv").config();
+const { v4: uuidv4 } = require("uuid");
 
 exports.verifyOTP = async (req, res) => {
   const { email, OTP } = req.body;
@@ -124,17 +125,46 @@ exports.verifyOTP = async (req, res) => {
           device: parser.getDevice(),
         };
 
+        await client_update.query(
+          "UPDATE app.user_sessions SET is_active = false WHERE user_id = $1",
+          [user.user_id]
+        );
+
         // Generate tokens
         const accessToken = authService.generateAccessToken(user);
         const refreshToken = authService.generateRefreshToken();
 
-        // Create session
-        await authService.createSession(
-          user.user_id,
+        const userId = user.user_id;
+        const ipAddress = req.ip;
+        const sessionId = uuidv4();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
+        // Deactivate all existing sessions for this user
+        await client_update.query(
+          "UPDATE app.user_sessions SET is_active = false WHERE user_id = $1",
+          [userId]
+        );
+
+        // Create new session
+        const query = `
+            INSERT INTO app.user_sessions (
+                session_id, user_id, refresh_token, device_info, 
+                ip_address, expires_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *;
+        `;
+
+        await client_update.query(query, [
+          sessionId,
+          userId,
           refreshToken,
           deviceInfo,
-          req.ip
-        );
+          ipAddress,
+          expiresAt,
+        ]);
+
 
         // Disable used OTP
         await client_update.query(
@@ -142,18 +172,6 @@ exports.verifyOTP = async (req, res) => {
           [email]
         );
 
-        // Generate JWT token
-        // const token = jwt.sign(
-        //     {
-        //         user_id: user.user_id,
-        //         email: user.email,
-        //         role: user.role,
-        //         first_name: user.first_name,
-        //         last_name: user.last_name
-        //     },
-        //     process.env.JWT_SECRET,
-        //     { expiresIn: '24h' }
-        // );
 
         // Determine redirect path based on role
         let redirectPath;
@@ -171,18 +189,30 @@ exports.verifyOTP = async (req, res) => {
             redirectPath = "/login";
         }
 
-        // res.cookie('refreshToken', refreshToken, {
-        //     httpOnly: true,
-        //     // secure: process.env.NODE_ENV === 'production',
-        //     // sameSite: 'strict',
-        //     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        // });
+        res.cookie("sessionid", sessionId, {
+          httpOnly: false, // Allow JavaScript access in development
+          secure: false, // Allow non-HTTPS in development
+          sameSite: "Lax", // Allow cross-site cookies
+          domain: "localhost", // Explicitly set domain
+          path: "/",
+          maxAge: 24 * 60 * 60 * 1000, // 1 days
+        });
+
+        res.cookie("refreshtoken", refreshToken, {
+          httpOnly: false, // Allow JavaScript access in development
+          secure: false, // Allow non-HTTPS in development
+          sameSite: "Lax", // Allow cross-site cookies
+          domain: "localhost", // Explicitly set domain
+          path: "/",
+          maxAge: 20 * 60 * 1000, // 20 minutes
+        });
+
+
 
         return res.status(200).json({
           success: true,
           message: "OTP verified successfully.",
           token: accessToken,
-          refreshToken: refreshToken,
           data: {
             email: user.email,
             role: user.role,
@@ -190,6 +220,7 @@ exports.verifyOTP = async (req, res) => {
             last_name: user.last_name,
           },
           redirectPath,
+          cookieSet: true,
         });
       } else {
         await client_update.query("ROLLBACK");

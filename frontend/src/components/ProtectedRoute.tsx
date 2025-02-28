@@ -1,42 +1,72 @@
-import type React from 'react'
-import { Navigate } from 'react-router-dom'
-// import { isAuthenticated } from '@/store/authStore'
-import { useTokenRefresh } from '@/hooks/useTokenRefresh';
+import type React from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useTokenRefresh, checkSession } from "@/hooks/useTokenRefresh";
+import { useEffect, useState } from "react";
+import { useAuthStore } from "@/store/authStore";
 interface ProtectedRouteProps {
-  children: React.ReactNode
-  allowedRoles: string[]
+  children: React.ReactNode;
+  allowedRoles: string[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem('token')
-  const userRole = localStorage.getItem('userRole')?.toLowerCase()
-  // const location = useLocation();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  allowedRoles,
+}) => {
+  const token = localStorage.getItem("token");
+  const userRole = localStorage.getItem("userRole")?.toLowerCase();
+  const { clearAuth } = useAuthStore();
+  const navigate = useNavigate();
+  const [isValidSession, setIsValidSession] = useState(true);
+
 
   useTokenRefresh();
 
-  // if (!isAuthenticated()) {
-  //   return <Navigate to="/login" state={{ from: location }} replace />;
-  // }
+  // Session validation logic
+  useEffect(() => {
+    const validateSession = async () => {
+      if (!token) {
+        setIsValidSession(false);
+        return;
+      }
 
-  if (!token) {
-    return <Navigate to="/" replace />
+      const isValid = await checkSession(token);
+      setIsValidSession(isValid);
+
+      if (!isValid) {
+        clearAuth(); // Clear auth state if session is invalid
+        navigate("/"); // Redirect to home or login page
+      }
+    };
+    // Run session validation immediately
+    validateSession();
+
+    // Set up an interval to validate the session every 3 seconds
+    const intervalId = setInterval(validateSession, 3000);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [token, navigate, clearAuth]);
+
+
+  if (!token || !isValidSession) {
+    return <Navigate to="/" replace />;
   }
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     // Redirect to appropriate page based on role
-    switch (userRole) { 
-      case 'admin':
-        return <Navigate to="/admin" replace />
-      case 'maker':
-        return <Navigate to="/dashboard" replace />
-      case 'checker':
-        return <Navigate to="/checker" replace />
+    switch (userRole) {
+      case "admin":
+        return <Navigate to="/admin" replace />;
+      case "maker":
+        return <Navigate to="/dashboard" replace />;
+      case "checker":
+        return <Navigate to="/checker" replace />;
       default:
-        return <Navigate to="/" replace />
+        return <Navigate to="/" replace />;
     }
   }
 
-  return <>{children}</>
-}
+  return <>{children}</>;
+};
 
-export default ProtectedRoute
+export default ProtectedRoute;

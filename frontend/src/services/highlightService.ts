@@ -11,6 +11,7 @@ export const fetchHighlightedCells = async (
   try {
     const response = await fetch(`${API_URL}/highlight-cells`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,

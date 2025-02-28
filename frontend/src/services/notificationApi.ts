@@ -51,6 +51,7 @@ export const fetchNotifications = async (
 
     const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
       headers: getAuthHeaders(),
+      withCredentials: true,
     });
 
     if (response.data.success) {

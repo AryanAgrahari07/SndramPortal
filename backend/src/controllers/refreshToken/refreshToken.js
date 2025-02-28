@@ -3,21 +3,16 @@ const jwt = require("jsonwebtoken");
 
 exports.refreshToken = async (req, res) => {
   try {
-    // const { refreshToken } = req.body;
+    const refreshToken = req.cookies.refreshtoken;
 
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
-
-    // console.log("token is", token);
-
-    if (!token) {
+    if (!refreshToken) {
       return res.status(400).json({
         success: false,
         message: "Refresh token is required",
       });
     }
 
-    const session = await authService.validateRefreshToken(token);
+    const session = await authService.validateRefreshToken(refreshToken);
 
     if (!session) {
       return res.status(401).json({
@@ -34,7 +29,7 @@ exports.refreshToken = async (req, res) => {
         role: session.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" } // Set appropriate expiration time
+      { expiresIn: "1m" } // Set appropriate expiration time
     );
 
     const newRefreshToken = authService.generateRefreshToken();
@@ -53,12 +48,20 @@ exports.refreshToken = async (req, res) => {
     //     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     // });
 
+    res.cookie("refreshtoken", newRefreshToken, {
+      httpOnly: false, // Allow JavaScript access in development
+      secure: false, // Allow non-HTTPS in development
+      sameSite: "Lax", // Allow cross-site cookies
+      domain: "localhost", // Explicitly set domain
+      path: "/",
+      maxAge: 20 * 60 * 1000, // 20 minutes
+    });
+
     // --------
 
     return res.status(200).json({
       success: true,
       token: accessToken,
-      refreshToken: newRefreshToken,
       data: {
         email: session.email,
         role: session.role,

@@ -28,6 +28,7 @@ export const getGroupList = async (): Promise<TableGroup[]> => {
       `${API_BASE_URL}/getgrouplist`,
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {
@@ -57,6 +58,7 @@ export const addGroup = async (name: string): Promise<void> => {
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {
@@ -81,6 +83,7 @@ export const addTable = async (
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {
@@ -101,6 +104,7 @@ export const deleteGroup = async (groupName: string): Promise<void> => {
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {
@@ -125,6 +129,7 @@ export const deleteTable = async (
       },
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {
@@ -142,6 +147,7 @@ export const getAllTables = async (): Promise<string[]> => {
       `${API_BASE_URL}/table`,
       {
         headers: getAuthHeaders(),
+        withCredentials: true,
       }
     );
     if (!response.data.success) {

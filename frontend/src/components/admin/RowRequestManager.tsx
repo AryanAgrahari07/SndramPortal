@@ -160,6 +160,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       setIsLoading(true);
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/fetchrowrequest", {
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -199,6 +200,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/acceptrow", {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -234,6 +236,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/rejectrow", {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -295,6 +298,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/acceptallrow", {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -332,6 +336,7 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8080/rejectallrow", {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

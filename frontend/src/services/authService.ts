@@ -22,6 +22,7 @@ export const authService = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, OTP }),
+      credentials: 'include',
     })
     return response.json()
   },

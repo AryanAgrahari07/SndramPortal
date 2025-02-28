@@ -11,6 +11,7 @@ const getAuthHeaders = () => {
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
+    withCredentials: true, 
   };
 };
 
@@ -20,6 +21,7 @@ export const submitRequestData = async (
   try {
     const response = await axios.post(`${API_BASE_URL}/requestdata`, payload, {
       headers: getAuthHeaders(),
+      withCredentials: true, 
     });
     return response.data;
   } catch (error) {
@@ -31,6 +33,7 @@ export const fetchGroupList = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/getgrouplist`, {
       headers: getAuthHeaders(),
+      withCredentials: true,
     });
 
     if (response.data.success) {

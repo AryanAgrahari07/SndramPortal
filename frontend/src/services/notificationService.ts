@@ -69,6 +69,7 @@ export const notificationService = {
 
       const response = await fetch(`${API_URL}/mark-notifications-seen`, {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -96,6 +97,7 @@ export const notificationService = {
     try {
       const response = await fetch(`${API_URL}/mark-notifications-read`, {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -119,6 +121,7 @@ export const notificationService = {
     try {
       const response = await fetch(`${API_URL}/users/emails`, {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -295,6 +298,7 @@ export const fetchCheckerNotifications = async (): Promise<Notification[]> => {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
+    credentials: "include",
   });
 
   const data = await response.json();

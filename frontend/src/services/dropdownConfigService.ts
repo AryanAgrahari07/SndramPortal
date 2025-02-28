@@ -25,7 +25,7 @@ export const dropdownConfigService = {
   async getTables() {
     const response = await axios.get<DropdownResponse>(
       'http://localhost:8080/table',
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), withCredentials: true  }
     );
     return response.data.data || [];
   },
@@ -34,7 +34,7 @@ export const dropdownConfigService = {
     const response = await axios.post<DropdownResponse>(
       `http://localhost:8080/fetchcolumn`,
       { table_name: tableName },
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), withCredentials: true  }
     );
     return response.data;
   },
@@ -46,7 +46,7 @@ export const dropdownConfigService = {
         table_name: tableName,
         columnName: columnName,
       },
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), withCredentials: true  }
     );
     return response.data;
   },
@@ -61,7 +61,7 @@ export const dropdownConfigService = {
         table_name: tableName,
         dropdown_options: dropdownOptions,
       },
-      { headers: getAuthHeaders() }
+      { headers: getAuthHeaders(), withCredentials: true }
     );
     return response.data;
   },

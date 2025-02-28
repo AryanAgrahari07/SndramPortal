@@ -12,7 +12,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   user: User | null;
-  setTokens: (accessToken: string, refreshToken: string) => void;
+  setTokens: (accessToken: string) => void;
   setUser: (user: User) => void;
   clearAuth: () => void;
 }
@@ -23,13 +23,12 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       user: null,
-      setTokens: (accessToken, refreshToken) => {
+      setTokens: (accessToken) => {
         // Update Zustand state
-        set({ accessToken, refreshToken });
+        set({ accessToken });
 
         // Maintain localStorage compatibility
         localStorage.setItem("token", accessToken);
-        localStorage.setItem("refreshToken", refreshToken);
       },
       setUser: (user) => {
         set({ user });
@@ -39,8 +38,7 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         set({ accessToken: null, refreshToken: null, user: null });
         // Clear localStorage
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("token");      
         localStorage.removeItem("user");
       },
     }),
@@ -51,8 +49,8 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Helper function to initialize store from localStorage
-export const isAuthenticated = () => {
-  const token = localStorage.getItem("token");
-  const refreshToken = localStorage.getItem("refreshToken");
-  return !!token && !!refreshToken;
-};
+// export const isAuthenticated = () => {
+//   const token = localStorage.getItem("token");
+//   const refreshToken = localStorage.getItem("refreshToken");
+//   return !!token && !!refreshToken;
+// };

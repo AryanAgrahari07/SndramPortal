@@ -57,6 +57,7 @@ export const Overview = () => {
       const ungroupedResponse = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.GET_REQUESTS}`,
         {
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
@@ -67,6 +68,7 @@ export const Overview = () => {
       const groupedResponse = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.GET_GROUP_REQUESTS}`,
         {
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
