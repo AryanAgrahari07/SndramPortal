@@ -5,7 +5,7 @@ export const EXCLUDED_TABLES = [
     'change_tracker',
     'add_row_table',
     'users',
-    'user_sessions',
+    // 'user_sessions',
     'group_table',
     'column_permission',
     'dynamic_dropdowns',

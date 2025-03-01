@@ -31,6 +31,17 @@ interface TableResponse {
 
 const ITEMS_PER_PAGE = 5;
 
+const VALIDATION_RULES = {
+  displayName: {
+    pattern: /^[a-zA-Z\s_-]{3,50}$/,
+    message: "Display name must be 3-50 characters and can only contain letters, spaces, underscores, and hyphens"
+  },
+  description: {
+    pattern: /^[a-zA-Z0-9\s.,_\-()]{0,200}$/,
+    message: "Description can only contain letters, numbers, spaces, and basic punctuation (max 200 characters)"
+  }
+};
+
 const TableConfigurator: React.FC = () => {
   const { toast } = useToast();
   const [tables, setTables] = useState<TableMetadata[]>([]);
@@ -38,9 +49,7 @@ const TableConfigurator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedTable, setSelectedTable] = useState<TableMetadata | null>(
-    null
-  );
+  const [selectedTable, setSelectedTable] = useState<TableMetadata | null>(null);
   const [formData, setFormData] = useState({
     original_table_name: "",
     display_name: "",
@@ -51,6 +60,39 @@ const TableConfigurator: React.FC = () => {
     tableId: "",
     tableName: "",
   });
+  const [validationErrors, setValidationErrors] = useState({
+    original_table_name: "",
+    display_name: "",
+    description: ""
+  });
+
+  const validateForm = (): boolean => {
+    const errors = {
+      original_table_name: "",
+      display_name: "",
+      description: ""
+    };
+
+    // Validate original table name if adding new table
+    if (!selectedTable && !formData.original_table_name) {
+      errors.original_table_name = "Please select a table";
+    }
+
+    // Validate display name
+    if (!formData.display_name) {
+      errors.display_name = "Display name is required";
+    } else if (!VALIDATION_RULES.displayName.pattern.test(formData.display_name)) {
+      errors.display_name = VALIDATION_RULES.displayName.message;
+    }
+
+    // Validate description if provided
+    if (formData.description && !VALIDATION_RULES.description.pattern.test(formData.description)) {
+      errors.description = VALIDATION_RULES.description.message;
+    }
+
+    setValidationErrors(errors);
+    return !Object.values(errors).some(error => error !== "");
+  };
 
   const handleDelete = (table: TableMetadata) => {
     setConfirmDialog({
@@ -85,7 +127,7 @@ const TableConfigurator: React.FC = () => {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast({
         title: "Error",
         description: "Failed to delete table configuration",
@@ -119,7 +161,7 @@ const TableConfigurator: React.FC = () => {
         setTables(data.data);
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast({
         title: "Error",
         description: "Failed to fetch renamed tables",
@@ -147,7 +189,7 @@ const TableConfigurator: React.FC = () => {
         setAvailableTables(filteredTables);
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast({
         title: "Error",
         description: "Failed to fetch available tables",
@@ -157,8 +199,23 @@ const TableConfigurator: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please check the form for errors",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
+      const sanitizedData = {
+        original_table_name: formData.original_table_name.trim(),
+        display_name: formData.display_name.trim(),
+        description: formData.description.trim()
+      };
+
       const endpoint = selectedTable
         ? `http://localhost:8080/update-renamed-tables/${selectedTable.id}`
         : "http://localhost:8080/rename-tables";
@@ -171,7 +228,7 @@ const TableConfigurator: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(sanitizedData),
       });
 
       const data = await response.json();
@@ -205,6 +262,11 @@ const TableConfigurator: React.FC = () => {
       description: "",
     });
     setSelectedTable(null);
+    setValidationErrors({
+      original_table_name: "",
+      display_name: "",
+      description: ""
+    });
   };
 
   const handleEdit = (table: TableMetadata) => {
@@ -213,6 +275,11 @@ const TableConfigurator: React.FC = () => {
       original_table_name: table.original_table_name,
       display_name: table.display_name,
       description: table.description || "",
+    });
+    setValidationErrors({
+      original_table_name: "",
+      display_name: "",
+      description: ""
     });
     setIsDialogOpen(true);
   };
@@ -332,7 +399,9 @@ const TableConfigurator: React.FC = () => {
                   Original Table Name
                 </Label>
                 <select
-                  className="w-full rounded-md border border-gray-200 p-2.5 focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10 bg-white text-sm"
+                  className={`w-full rounded-md border ${
+                    validationErrors.original_table_name ? 'border-red-500' : 'border-gray-200'
+                  } p-2.5 focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10 bg-white text-sm`}
                   value={formData.original_table_name}
                   onChange={(e) =>
                     setFormData({
@@ -341,15 +410,14 @@ const TableConfigurator: React.FC = () => {
                     })
                   }
                 >
-                  <option value="" className="text-gray-500">
-                    Select a table
-                  </option>
+                  <option value="">Select a table</option>
                   {availableTables.map((table) => (
-                    <option key={table} value={table}>
-                      {table}
-                    </option>
+                    <option key={table} value={table}>{table}</option>
                   ))}
                 </select>
+                {validationErrors.original_table_name && (
+                  <p className="text-xs text-red-500 mt-1">{validationErrors.original_table_name}</p>
+                )}
               </div>
             )}
 
@@ -363,16 +431,19 @@ const TableConfigurator: React.FC = () => {
                   setFormData({ ...formData, display_name: e.target.value })
                 }
                 placeholder="Enter display name"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10"
+                className={`w-full rounded-md border ${
+                  validationErrors.display_name ? 'border-red-500' : 'border-gray-200'
+                } px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10`}
               />
+              {validationErrors.display_name && (
+                <p className="text-xs text-red-500 mt-1">{validationErrors.display_name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">
                 Description
-                <span className="text-gray-400 ml-1 font-normal">
-                  (Optional)
-                </span>
+                <span className="text-gray-400 ml-1 font-normal">(Optional)</span>
               </Label>
               <Input
                 value={formData.description}
@@ -380,8 +451,13 @@ const TableConfigurator: React.FC = () => {
                   setFormData({ ...formData, description: e.target.value })
                 }
                 placeholder="Enter description"
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10"
+                className={`w-full rounded-md border ${
+                  validationErrors.description ? 'border-red-500' : 'border-gray-200'
+                } px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F172A]/10`}
               />
+              {validationErrors.description && (
+                <p className="text-xs text-red-500 mt-1">{validationErrors.description}</p>
+              )}
             </div>
           </div>
 

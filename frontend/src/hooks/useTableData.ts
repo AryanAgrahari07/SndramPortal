@@ -20,6 +20,7 @@ interface UseTableDataProps {
 export interface UseTableDataReturn {
   data: Record<string, unknown>[];
   columns: string[];
+  dataTypes: Record<string, string>;
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -34,6 +35,7 @@ export const useTableData = ({
 }: UseTableDataProps): UseTableDataReturn => {
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
+  const [dataTypes, setDataTypes] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -64,6 +66,7 @@ export const useTableData = ({
       if (response.success) {
         setData(response.data);
         setColumns(response.columns);
+        setDataTypes(response.dataTypes);
         setPagination(response.pagination);
       } else {
         setError(response.message || "Failed to fetch table data");
@@ -108,6 +111,7 @@ export const useTableData = ({
   return {
     data,
     columns,
+    dataTypes,
     isLoading,
     error,
     refresh: fetchDataFromApi,

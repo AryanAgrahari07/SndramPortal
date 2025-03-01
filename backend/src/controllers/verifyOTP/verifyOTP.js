@@ -138,7 +138,7 @@ exports.verifyOTP = async (req, res) => {
         const ipAddress = req.ip;
         const sessionId = uuidv4();
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+        expiresAt.setMinutes(expiresAt.getMinutes() + 20);  // 20 minutes from now
 
         // Deactivate all existing sessions for this user
         await client_update.query(
@@ -195,7 +195,7 @@ exports.verifyOTP = async (req, res) => {
           sameSite: "Lax", // Allow cross-site cookies
           domain: "localhost", // Explicitly set domain
           path: "/",
-          maxAge: 24 * 60 * 60 * 1000, // 1 days
+          maxAge: 12 * 60 * 60 * 1000, // 12 hours
         });
 
         res.cookie("refreshtoken", refreshToken, {

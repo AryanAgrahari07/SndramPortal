@@ -81,6 +81,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   const {
     data: processedData,
     columns,
+    dataTypes,
     isLoading: isDataLoading,
     error: dataError,
     refresh: refreshData,
@@ -725,6 +726,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         isColumnEditable={isColumnEditable}
         tableName={tableName}
         dropdownColumns={dropdownColumns}
+        dataTypes={dataTypes}
       />
     </div>
   );

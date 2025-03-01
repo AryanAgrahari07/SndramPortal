@@ -36,6 +36,11 @@ const INITIAL_USER_STATE: User = {
   role: "maker",
 };
 
+const VALIDATION_PATTERNS = {
+  name: /^[A-Za-z\s'-]+$/,  // Only letters, spaces, hyphens, and apostrophes
+  email: /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+};
+
 const UserManagement: React.FC = () => {
   const { toast } = useToast();
 
@@ -110,13 +115,39 @@ const UserManagement: React.FC = () => {
   // Form validation
   const validateForm = useCallback((user: User): Record<string, string> => {
     const errors: Record<string, string> = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!user.firstName?.trim()) errors.firstName = "First name is required";
-    if (!user.lastName?.trim()) errors.lastName = "Last name is required";
-    if (!user.email?.trim()) errors.email = "Email is required";
-    if (!emailRegex.test(user.email)) errors.email = "Invalid email format";
-
+  
+    // First Name validation
+    if (!user.firstName?.trim()) {
+      errors.firstName = "First name is required";
+    } else if (!VALIDATION_PATTERNS.name.test(user.firstName)) {
+      errors.firstName = "First name can only contain letters, spaces, hyphens, and apostrophes";
+    } else if (user.firstName.length > 50) {
+      errors.firstName = "First name cannot exceed 50 characters";
+    }
+  
+    // Last Name validation
+    if (!user.lastName?.trim()) {
+      errors.lastName = "Last name is required";
+    } else if (!VALIDATION_PATTERNS.name.test(user.lastName)) {
+      errors.lastName = "Last name can only contain letters, spaces, hyphens, and apostrophes";
+    } else if (user.lastName.length > 50) {
+      errors.lastName = "Last name cannot exceed 50 characters";
+    }
+  
+    // Email validation
+    if (!user.email?.trim()) {
+      errors.email = "Email is required";
+    } else if (!VALIDATION_PATTERNS.email.test(user.email)) {
+      errors.email = "Invalid email format";
+    } else if (user.email.length > 100) {
+      errors.email = "Email cannot exceed 100 characters";
+    }
+  
+    // Role validation
+    if (!user.role || !['maker', 'checker', 'admin'].includes(user.role)) {
+      errors.role = "Invalid role selected";
+    }
+  
     return errors;
   }, []);
 
@@ -188,10 +219,25 @@ const UserManagement: React.FC = () => {
           type={type}
           placeholder={label}
           value={value}
-          onChange={onChange}
+          onChange={(e) => {
+            // For name fields, prevent non-letter characters from being typed
+            if ((field === 'firstName' || field === 'lastName') && 
+                !VALIDATION_PATTERNS.name.test(e.target.value) && 
+                e.target.value !== '') {
+              return;
+            }
+            onChange(e);
+          }}
+          onBlur={(e) => {
+            // Validate on blur
+            const testUser = { ...newUser, [field]: e.target.value };
+            const validationErrors = validateForm(testUser);
+            setErrors(prev => ({ ...prev, [field]: validationErrors[field] }));
+          }}
           className={errors[field] ? "border-red-500" : ""}
           aria-label={label}
           aria-invalid={!!errors[field]}
+          maxLength={field === 'email' ? 100 : 50}
         />
         {errors[field] && (
           <p className="text-red-500 text-sm" role="alert">
@@ -200,14 +246,23 @@ const UserManagement: React.FC = () => {
         )}
       </div>
     ),
-    [errors]
+    [errors, newUser, validateForm]
   );
 
   // Create user handler
   const handleCreateUser = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const validationErrors = validateForm(newUser);
+
+      const sanitizedUser = {
+        ...newUser,
+        firstName: newUser.firstName.trim(),
+        lastName: newUser.lastName.trim(),
+        email: newUser.email.trim().toLowerCase(),
+        role: newUser.role
+      };
+  
+      const validationErrors = validateForm(sanitizedUser);
 
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
@@ -220,7 +275,7 @@ const UserManagement: React.FC = () => {
       }
 
       try {
-        const response = await createUser(newUser);
+        const response = await createUser(sanitizedUser);
         if (response.success) {
           setNewUser(INITIAL_USER_STATE);
           setErrors({});
@@ -261,7 +316,17 @@ const UserManagement: React.FC = () => {
   const handleUpdateUser = useCallback(async () => {
     if (!editingUser?.id) return;
 
-    const validationErrors = validateForm(editingUser);
+    // Sanitize input before validation
+    const sanitizedUser = {
+      ...editingUser,
+      firstName: editingUser.firstName.trim(),
+      lastName: editingUser.lastName.trim(),
+      email: editingUser.email.trim().toLowerCase(),
+      role: editingUser.role
+    };
+
+    const validationErrors = validateForm(sanitizedUser);
+
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -274,13 +339,7 @@ const UserManagement: React.FC = () => {
     }
 
     try {
-      const response = await updateUser(editingUser.id.toString(), {
-        email: editingUser.email,
-        firstName: editingUser.firstName,
-        lastName: editingUser.lastName,
-        role: editingUser.role,
-        // password: editingUser.password, // Only included if changed
-      });
+      const response = await updateUser(editingUser.id.toString(), sanitizedUser);
 
       if (response.success) {
         setDialogState((prev) => ({ ...prev, edit: { open: false } }));

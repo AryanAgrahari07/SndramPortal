@@ -48,6 +48,30 @@ const GroupConfiguration: React.FC = () => {
     groupName: "",
   });
 
+  const validateGroupName = (name: string): { isValid: boolean; message: string } => {
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+      return { isValid: false, message: "Group name is required" };
+    }
+
+    if (trimmedName.length < 3 || trimmedName.length > 50) {
+      return { isValid: false, message: "Group name must be between 3 and 50 characters" };
+    }
+
+    const validCharactersRegex = /^[A-Za-z\s_-]+$/;
+    if (!validCharactersRegex.test(trimmedName)) {
+      return { isValid: false, message: "Group name can only contain letters, spaces, underscores, and hyphens" };
+    }
+
+    // Check for duplicate group names
+    if (groups.some(group => group.group_name.toLowerCase() === trimmedName.toLowerCase())) {
+      return { isValid: false, message: "Group name already exists" };
+    }
+
+    return { isValid: true, message: "" };
+  };
+
   useEffect(() => {
     fetchGroups();
     fetchAvailableTables();
@@ -119,10 +143,11 @@ const GroupConfiguration: React.FC = () => {
   };
 
   const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) {
+    const validation = validateGroupName(newGroupName);
+    if (!validation.isValid) {
       toast({
         title: "Error",
-        description: "Group name is required",
+        description: validation.message,
         variant: "destructive",
       });
       return;
@@ -131,6 +156,8 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
+      const sanitizedGroupName = encodeURIComponent(newGroupName.trim());
+      
       const response = await fetch("http://localhost:8080/addGroup", {
         method: "POST",
         credentials: "include",
@@ -138,7 +165,7 @@ const GroupConfiguration: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ group_name: newGroupName.trim() }),
+        body: JSON.stringify({ group_name: sanitizedGroupName }),
       });
 
       const data = await response.json();
@@ -308,7 +335,7 @@ const GroupConfiguration: React.FC = () => {
     <div className="space-y-6 p-6 bg-[#F8FAFC]">
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="flex items-center justify-between text-[#0F172A] mb-8 ">
+        <div className="flex items-center justify-between text-[#0F172A] mb-8">
           <div className="flex items-center space-x-4">
             <Database className="h-6 w-6" />
             <h2 className="text-2xl font-semibold">Group Configuration</h2>
@@ -431,7 +458,6 @@ const GroupConfiguration: React.FC = () => {
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
             <div className="flex flex-col gap-0">
-              {/* Header Section */}
               <div className="px-6 pt-6 pb-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col gap-1">
@@ -439,24 +465,12 @@ const GroupConfiguration: React.FC = () => {
                       Create New Group
                     </DialogTitle>
                     <DialogDescription className="text-sm text-gray-500">
-                      Enter a name for the new group to manage table
-                      permissions.
+                      Enter a name for the new group to manage table permissions.
                     </DialogDescription>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsCreateDialogOpen(false);
-                      setNewGroupName("");
-                    }}
-                    className="rounded-md p-1.5 hover:bg-gray-100 transition-colors"
-                  >
-                    {/* <X className="h-4 w-4 text-gray-500" /> */}
-                    <span className="sr-only">Close</span>
-                  </button>
                 </div>
               </div>
 
-              {/* Content Section */}
               <div className="px-6 py-4 bg-gray-50 border-y border-gray-100">
                 <div className="space-y-3">
                   <div className="space-y-2">
@@ -466,19 +480,30 @@ const GroupConfiguration: React.FC = () => {
                     <Input
                       placeholder="Enter group name"
                       value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      className="w-full p-2.5 rounded-md border border-gray-200 focus:ring-2 focus:ring-[#0F172A]/10 focus:border-[#0F172A] bg-white"
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (/^[A-Za-z\s_-]*$/.test(value)) {
+                          setNewGroupName(value);
+                        }
+                      }}
+                      className={`w-full p-2.5 rounded-md border ${
+                        newGroupName && !validateGroupName(newGroupName).isValid
+                          ? "border-red-500 focus:ring-red-500"
+                          : "border-gray-200 focus:ring-[#0F172A]/10 focus:border-[#0F172A]"
+                      } bg-white`}
                     />
+                    {newGroupName && !validateGroupName(newGroupName).isValid && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {validateGroupName(newGroupName).message}
+                      </p>
+                    )}
                   </div>
-
-                  {/* Optional: Add helper text */}
                   <p className="text-sm text-gray-500">
-                    Group name should be unique and descriptive.
+                    Group name should contain only letters, spaces, underscores, and hyphens.
                   </p>
                 </div>
               </div>
 
-              {/* Footer Section */}
               <div className="px-6 py-4 flex justify-end gap-3">
                 <Button
                   variant="outline"
@@ -493,7 +518,7 @@ const GroupConfiguration: React.FC = () => {
                 </Button>
                 <Button
                   onClick={handleCreateGroup}
-                  disabled={isLoading || !newGroupName.trim()}
+                  disabled={isLoading || !validateGroupName(newGroupName).isValid}
                   className="px-4 py-2 text-sm font-medium text-white bg-[#0F172A] hover:bg-[#0F172A]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]"
                 >
                   {isLoading ? (
@@ -509,6 +534,7 @@ const GroupConfiguration: React.FC = () => {
             </div>
           </DialogContent>
         </Dialog>
+
         {/* Add Tables Dialog */}
         <Dialog
           open={isAddTablesDialogOpen}
@@ -525,7 +551,6 @@ const GroupConfiguration: React.FC = () => {
               {selectedGroup &&
                 availableTables
                   .filter((table) => {
-                    // Ensure selectedGroup.tables is not null or undefined
                     const groupTables = selectedGroup.tables || [];
                     return !groupTables.includes(table);
                   })
@@ -568,10 +593,10 @@ const GroupConfiguration: React.FC = () => {
               <Button
                 onClick={handleAddTablesToGroup}
                 className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
-                disabled={isLoading}
+                disabled={isLoading || selectedTables.length === 0}
               >
                 {isLoading ? (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     <span>Adding...</span>
                   </div>

@@ -30,7 +30,7 @@ class AuthService {
   async createSession(userId, refreshToken, deviceInfo, ipAddress) {
     const sessionId = uuidv4();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+    expiresAt.setMinutes(expiresAt.getMinutes() + 20); // 20 minutes from now
 
     // Deactivate all existing sessions for this user
     await client_update.query(
@@ -64,7 +64,8 @@ class AuthService {
     const query = `
             UPDATE app.user_sessions 
             SET refresh_token = $1,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = CURRENT_TIMESTAMP,
+                expires_at = NOW() + INTERVAL '20 minutes'
             WHERE session_id = $2
         `;
 

@@ -22,10 +22,10 @@ exports.getTableData = async (req, res) => {
     // WHERE clause for filters and search
     const whereConditions = [];
 
+    const columns = await getTableColumns(tableName);
     // Handle global search
     if (searchQuery) {
       const searchConditions = [];
-      const columns = await getTableColumns(tableName);
 
       columns.forEach((column) => {
         searchConditions.push(`CAST(${column} AS TEXT) ILIKE $${valueIndex}`);
@@ -108,10 +108,17 @@ exports.getTableData = async (req, res) => {
       values.slice(0, -2)
     );
 
+    const dataTypes = columns.reduce((acc, column) => {
+      acc[column.column_name] = column.data_type;
+      return acc;
+    }, {});
+
+
     return res.status(200).json({
       success: true,
       data: result.rows,
       columns: result.fields.map((field) => field.name), // Add columns
+      dataTypes: dataTypes,
       pagination: {
         total: parseInt(countResult.rows[0].count),
         totalPages: Math.ceil(
@@ -134,11 +141,12 @@ exports.getTableData = async (req, res) => {
 // Helper function to get table columns
 async function getTableColumns(tableName) {
   const query = `
-        SELECT column_name
+        SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_schema = 'app'
         AND table_name = $1;
     `;
   const result = await client_update.query(query, [tableName]);
-  return result.rows.map((row) => row.column_name);
+  return result.rows;
+  // return result.rows.map((row) => row.column_name);
 }

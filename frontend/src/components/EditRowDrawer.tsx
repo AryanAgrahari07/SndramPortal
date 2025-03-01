@@ -14,6 +14,11 @@ interface EditRowDrawerProps {
   isColumnEditable: (column: string) => boolean;
   tableName: string;
   dropdownColumns: DropdownConfig[];
+  dataTypes: Record<string, string>;
+}
+
+interface ValidationErrors {
+  [key: string]: string;
 }
 
 export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
@@ -26,23 +31,23 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   isColumnEditable,
   tableName,
   dropdownColumns,
+  dataTypes,
 }) => {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<ValidationErrors>({});
   const { toast } = useToast();
 
   useEffect(() => {
     if (row) {
-      // Only including editable columns in form data
       const editableData = columns.reduce((acc, column) => {
         if (isColumnEditable(column)) {
-          acc[column] = row[column] || "";
+          acc[column] = row[column] ?? "";
         }
         return acc;
       }, {} as Record<string, unknown>);
       setFormData(editableData);
     } else {
-      // For new rows, including all editable columns
       const newRowData = columns.reduce((acc, column) => {
         if (isColumnEditable(column)) {
           acc[column] = "";
@@ -51,17 +56,105 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       }, {} as Record<string, unknown>);
       setFormData(newRowData);
     }
+    // Clear errors when row changes
+    setErrors({});
   }, [row, columns, isColumnEditable]);
+
+  const validateField = (column: string, value: unknown): string => {
+    if (value === null || value === undefined || value === "") return ""; // Allow empty values
+
+    const dataType = dataTypes[column]?.toLowerCase();
+    if (!dataType) return "";
+
+    const stringValue = String(value).trim();
+
+    switch (dataType) {
+      case "integer":
+        const numValue = Number(stringValue);
+        if (isNaN(numValue) || !Number.isInteger(numValue)) {
+          return "Must be a valid integer";
+        }
+        break;
+
+      case "date":
+        const dateValue = new Date(stringValue);
+        if (isNaN(dateValue.getTime())) {
+          return "Must be a valid date (YYYY-MM-DD)";
+        }
+        break;
+
+      case "uuid":
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(stringValue)) {
+          return "Must be a valid UUID";
+        }
+        break;
+
+      case "numeric":
+      case "decimal":
+        const numericValue = Number(stringValue);
+        if (isNaN(numericValue)) {
+          return "Must be a valid number";
+        }
+        break;
+
+      case "boolean":
+        if (!["true", "false", "0", "1"].includes(stringValue.toLowerCase())) {
+          return "Must be true or false";
+        }
+        break;
+
+      case "timestamp":
+      case "timestamp without time zone":
+      case "timestamp with time zone":
+        const timestampValue = new Date(stringValue);
+        if (isNaN(timestampValue.getTime())) {
+          return "Must be a valid timestamp";
+        }
+        break;
+    }
+    return "";
+  };
 
   const handleChange = (column: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [column]: value,
     }));
+
+    // Validate and set error
+    const error = validateField(column, value);
+    setErrors((prev) => ({
+      ...prev,
+      [column]: error,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate all fields before submission
+    const newErrors: ValidationErrors = {};
+    let hasErrors = false;
+
+    Object.entries(formData).forEach(([column, value]) => {
+      const error = validateField(column, value);
+      if (error) {
+        newErrors[column] = error;
+        hasErrors = true;
+      }
+    });
+
+    setErrors(newErrors);
+    if (hasErrors) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please correct the errors before submitting",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -73,7 +166,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
           description: "Row added successfully",
         });
       } else {
-        // Preserve non-editable values from original row
         const updatedRow = {
           ...row,
           ...formData,
@@ -81,11 +173,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         onSave(updatedRow);
       }
 
-      toast({
-            title: "Changes Saved",
-                description: "Your changes have been saved successfully.",
-               // Assuming your toast system supports variants
-         });
       onClose();
     } catch (error) {
       toast({
@@ -109,7 +196,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
           <div className="relative w-96">
             <div className="h-full flex flex-col bg-white shadow-xl">
-              {/* Header */}
               <div className="px-4 py-6 bg-gray-50 sm:px-6">
                 <div className="flex items-start justify-between space-x-3">
                   <div className="space-y-1">
@@ -132,34 +218,19 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="px-4 py-6 space-y-6 sm:px-6">
                   {columns.map((column) => {
-
-                    // Converting column names to a consistent format for comparison
-                    const normalizedColumn = column
-                      .toLowerCase()
-                      .replace(/_/g, "");
+                    const normalizedColumn = column.toLowerCase().replace(/_/g, "");
                     const dropdownConfig = dropdownColumns.find(
                       (dc) =>
                         dc.columnName.toLowerCase().replace(/_/g, "") ===
                         normalizedColumn
                     );
-
                     const isEditable = isColumnEditable(column);
                     const existingValue = row?.[column]
                       ? String(row[column])
                       : "";
-
-                    // console.log(
-                    //   "Column:",
-                    //   column,
-                    //   "Normalized:",
-                    //   normalizedColumn,
-                    //   "Available dropdowns:",
-                    //   dropdownColumns.map((dc) => dc.columnName)
-                    // );                                                 // Debug log
 
                     return (
                       <div key={column}>
@@ -180,7 +251,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                             placeholder="Select a value"
                             className="mt-1"
                             options={[
-                              // Including existing value at the top if it exists and isn't in options
                               ...(existingValue &&
                               !dropdownConfig.options.includes(existingValue)
                                 ? [
@@ -199,7 +269,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                           />
                         ) : (
                           <input
-                            type="text"
+                            type={dataTypes[column]?.includes("date") ? "date" : "text"}
                             name={column}
                             id={column}
                             value={String(
@@ -207,19 +277,25 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                                 ? formData[column] || ""
                                 : row?.[column] || ""
                             )}
-                            onChange={(e) =>
-                              handleChange(column, e.target.value)
-                            }
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            disabled={!isEditable || isLoading} // Disable if not editable
+                            onChange={(e) => handleChange(column, e.target.value)}
+                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                              errors[column]
+                                ? "border-red-300"
+                                : "border-gray-300"
+                            }`}
+                            disabled={!isEditable || isLoading}
                           />
+                        )}
+                        {errors[column] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors[column]}
+                          </p>
                         )}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Footer */}
                 <div className="flex-shrink-0 px-4 py-4 flex justify-end border-t border-gray-200">
                   <button
                     type="button"

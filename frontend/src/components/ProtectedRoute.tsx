@@ -1,8 +1,8 @@
 import type React from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import { useTokenRefresh, checkSession } from "@/hooks/useTokenRefresh";
-import { useEffect, useState } from "react";
-import { useAuthStore } from "@/store/authStore";
+import { Navigate } from "react-router-dom";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+// import { useEffect, useState } from "react";
+// import { useAuthStore } from "@/store/authStore";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
@@ -14,41 +14,41 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const token = localStorage.getItem("token");
   const userRole = localStorage.getItem("userRole")?.toLowerCase();
-  const { clearAuth } = useAuthStore();
-  const navigate = useNavigate();
-  const [isValidSession, setIsValidSession] = useState(true);
+  // const { clearAuth } = useAuthStore();
+  // const navigate = useNavigate();
+  // const [isValidSession, setIsValidSession] = useState(true);
 
 
   useTokenRefresh();
 
   // Session validation logic
-  useEffect(() => {
-    const validateSession = async () => {
-      if (!token) {
-        setIsValidSession(false);
-        return;
-      }
+  // useEffect(() => {
+  //   const validateSession = async () => {
+  //     if (!token) {
+  //       setIsValidSession(false);
+  //       return;
+  //     }
 
-      const isValid = await checkSession(token);
-      setIsValidSession(isValid);
+  //     const isValid = await checkSession(token);
+  //     setIsValidSession(isValid);
 
-      if (!isValid) {
-        clearAuth(); // Clear auth state if session is invalid
-        navigate("/"); // Redirect to home or login page
-      }
-    };
-    // Run session validation immediately
-    validateSession();
+  //     if (!isValid) {
+  //       clearAuth(); // Clear auth state if session is invalid
+  //       navigate("/"); // Redirect to home or login page
+  //     }
+  //   };
+  //   // Run session validation immediately
+  //   validateSession();
 
-    // Set up an interval to validate the session every 3 seconds
-    const intervalId = setInterval(validateSession, 3000);
+  //   // Set up an interval to validate the session every 3 seconds
+  //   const intervalId = setInterval(validateSession, 3000);
 
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(intervalId);
-  }, [token, navigate, clearAuth]);
+  //   // Clean up the interval when the component unmounts
+  //   return () => clearInterval(intervalId);
+  // }, [token, navigate, clearAuth]);
 
 
-  if (!token || !isValidSession) {
+  if (!token ) {
     return <Navigate to="/" replace />;
   }
 

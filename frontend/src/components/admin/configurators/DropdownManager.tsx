@@ -191,7 +191,10 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   };
 
   const handleAddOption = () => {
-    if (!newOption.trim()) {
+    const trimmedOption = newOption.trim();
+    
+    // Check if option is empty
+    if (!trimmedOption) {
       toast({
         title: "Error",
         description: "Option cannot be empty",
@@ -199,10 +202,20 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       });
       return;
     }
-
-    if (
-      options.some((opt) => opt.value.toLowerCase() === newOption.toLowerCase())
-    ) {
+  
+    // Validate option format using regex
+    const validFormat = /^[A-Za-z\s_-]+$/;
+    if (!validFormat.test(trimmedOption)) {
+      toast({
+        title: "Error",
+        description: "Option can only contain letters, spaces, underscores, and hyphens",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    // Check for duplicates
+    if (options.some((opt) => opt.value.toLowerCase() === trimmedOption.toLowerCase())) {
       toast({
         title: "Error",
         description: "Option already exists",
@@ -210,8 +223,8 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       });
       return;
     }
-
-    setOptions([...options, { value: newOption.trim() }]);
+  
+    setOptions([...options, { value: trimmedOption }]);
     setNewOption("");
   };
 
