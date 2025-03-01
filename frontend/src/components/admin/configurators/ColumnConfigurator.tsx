@@ -11,6 +11,7 @@ import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/Switch";
 import logo from "@/assets/images/select-table.svg";
+import { EXCLUDED_TABLES } from "@/config/tableConfig";
 
 interface ColumnConfig {
   column_name: string;
@@ -90,7 +91,9 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
 
       const data = (await response.json()) as TableResponse;
       if (data.success) {
-        const tableNames = data.tables.map((table) => table.table_name);
+        const tableNames = data.tables
+          .map((table) => table.table_name)
+          .filter((tableName) => !EXCLUDED_TABLES.includes(tableName));
         setTables(tableNames);
       } else {
         throw new Error(data.message || "Failed to fetch tables");

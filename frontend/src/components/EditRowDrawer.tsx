@@ -21,6 +21,17 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
+const formatDateForInput = (dateValue: string | null | undefined): string => {
+  if (!dateValue) return '';
+  
+  // Handle both date-only and timestamp formats
+  const date = new Date(dateValue);
+  if (isNaN(date.getTime())) return '';
+  
+  // Format as YYYY-MM-DD
+  return date.toISOString().split('T')[0];
+};
+
 export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   isOpen,
   onClose,
@@ -42,7 +53,11 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     if (row) {
       const editableData = columns.reduce((acc, column) => {
         if (isColumnEditable(column)) {
-          acc[column] = row[column] ?? "";
+          if (dataTypes[column]?.toLowerCase().includes('date')) {
+            acc[column] = formatDateForInput(row[column] as string);
+          } else {
+            acc[column] = row[column] ?? "";
+          }
         }
         return acc;
       }, {} as Record<string, unknown>);
@@ -56,17 +71,24 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       }, {} as Record<string, unknown>);
       setFormData(newRowData);
     }
-    // Clear errors when row changes
     setErrors({});
-  }, [row, columns, isColumnEditable]);
+  }, [row, columns, isColumnEditable, dataTypes]);
 
   const validateField = (column: string, value: unknown): string => {
-    if (value === null || value === undefined || value === "") return ""; // Allow empty values
+    if (value === null || value === undefined || value === "") {
+      return "This field cannot be empty";
+    }
+
+    const stringValue = String(value).trim();
+    
+    // Check for special characters/symbols
+    const symbolRegex = /[!#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
+    if (symbolRegex.test(stringValue)) {
+      return "Special characters are not allowed";
+    }
 
     const dataType = dataTypes[column]?.toLowerCase();
     if (!dataType) return "";
-
-    const stringValue = String(value).trim();
 
     switch (dataType) {
       case "integer":
@@ -133,19 +155,71 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate all fields before submission
+    // Initialize validation flags
     const newErrors: ValidationErrors = {};
     let hasErrors = false;
+    let hasChanges = false;
+    let hasAtLeastOneValue = false;
 
+    // First pass: Check for values and validate fields
     Object.entries(formData).forEach(([column, value]) => {
-      const error = validateField(column, value);
-      if (error) {
-        newErrors[column] = error;
-        hasErrors = true;
+      const stringValue = String(value || "").trim();
+      
+      if (stringValue !== "") {
+        hasAtLeastOneValue = true;
+        
+        // Validate non-empty fields
+        const error = validateField(column, value);
+        if (error) {
+          newErrors[column] = error;
+          hasErrors = true;
+        }
       }
     });
 
+    // Second pass: Check for actual changes in edit mode
+    if (mode === "edit" && row) {
+      hasChanges = false; // Reset hasChanges flag
+      Object.entries(formData).forEach(([column, value]) => {
+        const stringValue = String(value || "").trim();
+        const originalValue = row[column];
+        const isDate = dataTypes[column]?.toLowerCase().includes('date');
+
+        if (isDate) {
+          const formattedOriginal = formatDateForInput(originalValue as string);
+          if (formattedOriginal !== stringValue && stringValue !== "") {
+            hasChanges = true;
+          }
+        } else {
+          const originalString = String(originalValue || "").trim();
+          if (originalString !== stringValue && stringValue !== "") {
+            hasChanges = true;
+          }
+        }
+      });
+    }
+
     setErrors(newErrors);
+
+    // Validation checks
+    if (mode === "add" && !hasAtLeastOneValue) {
+      toast({
+        variant: "destructive",
+        title: "No Data Entered",
+        description: "Please fill at least one field before adding a row",
+      });
+      return;
+    }
+
+    if (mode === "edit" && !hasChanges) {
+      toast({
+        variant: "destructive",
+        title: "No Changes or Empty request Detected",
+        description: "Please make at least one change before saving",
+      });
+      return;
+    }
+
     if (hasErrors) {
       toast({
         variant: "destructive",
@@ -159,16 +233,65 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
     try {
       if (mode === "add") {
-        await addTableRow(tableName, formData);
+        // Remove empty fields before submitting
+        const nonEmptyData = Object.entries(formData).reduce((acc, [key, value]) => {
+          const stringValue = String(value || "").trim();
+          if (stringValue !== "") {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, unknown>);
+
+        if (Object.keys(nonEmptyData).length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Empty Data",
+            description: "Please fill at least one field with valid data",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        await addTableRow(tableName, nonEmptyData);
         toast({
           variant: "success",
           title: "Success",
           description: "Row added successfully",
         });
       } else {
+        // For edit mode, only include changed fields
+        const changedData = Object.entries(formData).reduce((acc, [key, value]) => {
+          const stringValue = String(value || "").trim();
+          const originalValue = row?.[key];
+          const isDate = dataTypes[key]?.toLowerCase().includes('date');
+          
+          if (isDate) {
+            const formattedOriginal = formatDateForInput(originalValue as string);
+            if (formattedOriginal !== stringValue && stringValue !== "") {
+              acc[key] = value;
+            }
+          } else {
+            const originalString = String(originalValue || "").trim();
+            if (originalString !== stringValue && stringValue !== "") {
+              acc[key] = value;
+            }
+          }
+          return acc;
+        }, {} as Record<string, unknown>);
+
+        if (Object.keys(changedData).length === 0) {
+          toast({
+            variant: "destructive",
+            title: "No Changes",
+            description: "Please make at least one change before saving",
+          });
+          setIsLoading(false);
+          return;
+        }
+
         const updatedRow = {
           ...row,
-          ...formData,
+          ...changedData,
         };
         onSave(updatedRow);
       }
@@ -228,8 +351,11 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         normalizedColumn
                     );
                     const isEditable = isColumnEditable(column);
+                    const isDateField = dataTypes[column]?.toLowerCase().includes('date');
                     const existingValue = row?.[column]
-                      ? String(row[column])
+                      ? isDateField 
+                        ? formatDateForInput(row[column] as string)
+                        : String(row[column])
                       : "";
 
                     return (
@@ -269,13 +395,15 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                           />
                         ) : (
                           <input
-                            type={dataTypes[column]?.includes("date") ? "date" : "text"}
+                            type={isDateField ? "date" : "text"}
                             name={column}
                             id={column}
                             value={String(
                               isEditable
                                 ? formData[column] || ""
-                                : row?.[column] || ""
+                                : isDateField
+                                  ? formatDateForInput(row?.[column] as string)
+                                  : row?.[column] || ""
                             )}
                             onChange={(e) => handleChange(column, e.target.value)}
                             className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
@@ -330,3 +458,5 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     </div>
   );
 };
+
+export default EditRowDrawer;

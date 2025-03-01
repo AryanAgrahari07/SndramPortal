@@ -47,6 +47,11 @@ const GroupConfiguration: React.FC = () => {
     groupId: "",
     groupName: "",
   });
+  const [confirmTableDialog, setConfirmTableDialog] = useState({
+    isOpen: false,
+    groupName: "",
+    tableName: "",
+  });
 
   const validateGroupName = (name: string): { isValid: boolean; message: string } => {
     const trimmedName = name.trim();
@@ -286,7 +291,16 @@ const GroupConfiguration: React.FC = () => {
     }
   };
 
-  const handleDeleteTable = async (groupName: string, tableName: string) => {
+
+  const handleDeleteTable = (groupName: string, tableName: string) => {
+    setConfirmTableDialog({
+      isOpen: true,
+      groupName,
+      tableName,
+    });
+  };
+
+  const confirmDeleteTable = async (groupName: string, tableName: string) => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -607,6 +621,19 @@ const GroupConfiguration: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+        isOpen={confirmTableDialog.isOpen}
+        onClose={() =>
+          setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" })
+        }
+        onConfirm={() => {
+          confirmDeleteTable(confirmTableDialog.groupName, confirmTableDialog.tableName);
+          setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" });
+        }}
+        title="Confirm Table Removal"
+        description={`Are you sure you want to remove "${confirmTableDialog.tableName}" from the group "${confirmTableDialog.groupName}"? This action cannot be undone.`}
+      />
       </div>
     </div>
   );
