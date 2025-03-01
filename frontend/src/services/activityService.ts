@@ -70,7 +70,7 @@ export class ActivityService {
         // })
 
         if (!lastActivity || !token || !refreshToken) {
-            console.log('Missing required tokens or activity time');
+          //  console.log('Missing required tokens or activity time');
             return;
         }
 
@@ -78,7 +78,7 @@ export class ActivityService {
         // console.log('Time since last activity:', Math.floor(timeSinceLastActivity / 1000), 'seconds');
         
         if (timeSinceLastActivity > this.INACTIVITY_TIMEOUT) {
-            console.log('Inactivity timeout reached, logging out...');
+         //   console.log('Inactivity timeout reached, logging out...');
             this.notifyInactivity();
         }
     }
@@ -90,7 +90,7 @@ export class ActivityService {
         }
 
         this.timeoutId = setInterval(() => {
-            console.log('Running scheduled inactivity check');
+         //   console.log('Running scheduled inactivity check');
             this.checkInactivity();
         }, 30000); // Check 30 seconds 
     }
