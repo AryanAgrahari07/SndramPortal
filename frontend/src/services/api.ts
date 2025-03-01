@@ -53,3 +53,34 @@ const handleApiError = (error: unknown): never => {
   }
   throw error;
 };
+
+
+
+import { enhancedFetch } from "@/utils/apiInterceptors";
+
+export const api = {
+    get: async (url: string) => {
+        const response = await enhancedFetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        return response.json();
+    },
+
+    post: async (url: string, data: any) => {
+        const response = await enhancedFetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+        return response.json();
+    },
+
+    // Add other methods as needed...
+};
