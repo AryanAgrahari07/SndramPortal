@@ -12,9 +12,42 @@ import { RowRequestManager } from "./components/admin";
 import { Toaster } from "./components/ui/toaster";
 import { useEffect } from "react";
 import { toast } from "./hooks/use-toast";
+import { setupAxiosInterceptors } from "./utils/apiInterceptors";
+import { useInactivityTimeout } from "./hooks/useInactivityTimeout";
+import { CookieManager } from "./utils/cookieManager";
 
 const App: React.FC = () => {
   const navigate = useNavigate();
+
+
+   // Initialize activity tracking
+  //  useEffect(() => {
+  //   const activityService = ActivityService.getInstance();
+  //   const token = localStorage.getItem('token');
+  //   const refreshToken = CookieManager.get('refreshtoken');
+
+  //   // Only initialize if user is logged in
+  //   if (token && refreshToken) {
+  //     console.log('Initializing activity service');
+  //     activityService.updateActivity();
+      
+  //     // Force an immediate check
+  //     activityService.checkInactivity();
+  //   }
+
+  //   return () => {
+  //     console.log('Cleaning up activity service');
+  //     activityService.cleanup();
+  //   };
+  // }, []);
+
+  
+  useInactivityTimeout();
+
+  useEffect(() => {
+    setupAxiosInterceptors();
+  }, []);
+
 
   useEffect(() => {
     // Store the original fetch
@@ -25,6 +58,12 @@ const App: React.FC = () => {
       const response = await originalFetch(...args);
 
       if (response.status === 401) {
+       
+        CookieManager.clearAll(); 
+
+        // Clear localStorage
+        localStorage.clear();
+
         toast({
           title: "Error",
           description: "Session expired, please login again",

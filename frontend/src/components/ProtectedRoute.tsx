@@ -1,6 +1,9 @@
 import type React from "react";
 import { Navigate } from "react-router-dom";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { useEffect } from "react";
+import { setupAxiosInterceptors } from "@/utils/apiInterceptors";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 // import { useEffect, useState } from "react";
 // import { useAuthStore } from "@/store/authStore";
 interface ProtectedRouteProps {
@@ -20,6 +23,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
 
   useTokenRefresh();
+
+  useInactivityTimeout();
+
+  useEffect(() => {
+    setupAxiosInterceptors();
+  }, []);
 
   // Session validation logic
   // useEffect(() => {
