@@ -187,6 +187,13 @@ export const TableRequests = () => {
         });
         fetchRequests();
       }
+      else if(data.success === false){
+        toast({
+          title: "Invalid format",
+          description: "Failed to approve request",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.log(error);
       toast({
@@ -269,6 +276,13 @@ export const TableRequests = () => {
         });
         setSelectedRequests([]);
         await fetchRequests();
+      }
+      else if(data.success === false){
+        toast({
+          title: "Invalid format",
+          description: "Failed to approve requests",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.log(error);

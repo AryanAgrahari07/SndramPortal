@@ -28,7 +28,7 @@ exports.getTableData = async (req, res) => {
       const searchConditions = [];
 
       columns.forEach((column) => {
-        searchConditions.push(`CAST(${column} AS TEXT) ILIKE $${valueIndex}`);
+        searchConditions.push(`CAST("${column.column_name}" AS TEXT) ILIKE $${valueIndex}`);
         values.push(`%${searchQuery}%`);
         valueIndex++;
       });

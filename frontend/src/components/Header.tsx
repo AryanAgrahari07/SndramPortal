@@ -3,6 +3,7 @@ import { NotificationDrawer } from "./NotificationDrawer";
 import { ChevronDown, Bell } from "lucide-react";
 import logo from "../assets/images/Logo-Full.svg";
 import { notificationService } from "@/services/notificationService";
+import { CookieManager } from "@/utils/cookieManager";
 
 export const Header: React.FC = () => {
   const [showLogout, setShowLogout] = useState(false);
@@ -45,6 +46,7 @@ export const Header: React.FC = () => {
   const handleLogout = () => {
     // Clear localStorage
     localStorage.clear();
+    CookieManager.clearAll();
     // Redirect to login
     window.location.href = "/login";
   };

@@ -292,8 +292,8 @@ export const fetchDropdownOptions = async (
       throw new Error(data.message || "Failed to fetch dropdown options");
     }
 
-    if (!data.success) {
-      throw new Error(data.message || "Failed to fetch dropdown options");
+    if (!data.success || !data.data) {
+      return [];
     }
 
     console.log("Fetched dropdown options:", data.data); // Debug log

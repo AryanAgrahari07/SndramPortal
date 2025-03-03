@@ -81,10 +81,17 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
     const stringValue = String(value).trim();
     
-    // Check for special characters/symbols
-    const symbolRegex = /[!#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
-    if (symbolRegex.test(stringValue)) {
-      return "Special characters are not allowed";
+    if (column.toLowerCase() === "name") {
+      const nameRegex = /^[A-Za-z\s]+$/;
+      if (!nameRegex.test(stringValue)) {
+        return "Name can only contain letters and spaces";
+      }
+    } else {
+      // Check for special characters/symbols (existing validation)
+      const symbolRegex = /[!#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
+      if (symbolRegex.test(stringValue)) {
+        return "Special characters are not allowed";
+      }
     }
 
     const dataType = dataTypes[column]?.toLowerCase();
