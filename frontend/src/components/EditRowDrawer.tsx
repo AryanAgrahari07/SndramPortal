@@ -3,6 +3,8 @@ import { X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addTableRow, DropdownConfig } from "@/services/tableDataService";
 import DynamicDropdown from "@/components/ui/DynamicDropdown";
+import {isSymbolAllowed, isNumberAllowed, preventXSS, isSpaceAllowed } from "@/config/ValidationConfig";
+import { sanitizeInput } from "@/utils/security";
 
 interface EditRowDrawerProps {
   isOpen: boolean;
@@ -49,10 +51,15 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   const [errors, setErrors] = useState<ValidationErrors>({});
   const { toast } = useToast();
 
+  const isPrimaryKey = (column: string): boolean => {
+    const expectedPkName = `${tableName}_sk`.toLowerCase();
+    return column.toLowerCase() === expectedPkName;
+  };
+
   useEffect(() => {
     if (row) {
       const editableData = columns.reduce((acc, column) => {
-        if (isColumnEditable(column)) {
+        if (isColumnEditable(column) && !isPrimaryKey(column)) {
           if (dataTypes[column]?.toLowerCase().includes('date')) {
             acc[column] = formatDateForInput(row[column] as string);
           } else {
@@ -64,7 +71,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       setFormData(editableData);
     } else {
       const newRowData = columns.reduce((acc, column) => {
-        if (isColumnEditable(column)) {
+        if (isColumnEditable(column)  && !isPrimaryKey(column)) {
           acc[column] = "";
         }
         return acc;
@@ -72,7 +79,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       setFormData(newRowData);
     }
     setErrors({});
-  }, [row, columns, isColumnEditable, dataTypes]);
+  }, [row, columns, isColumnEditable, dataTypes, tableName]);
 
   const validateField = (column: string, value: unknown): string => {
     if (value === null || value === undefined || value === "") {
@@ -80,21 +87,58 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     }
 
     const stringValue = String(value).trim();
-    
-    if (column.toLowerCase() === "name") {
-      const nameRegex = /^[A-Za-z\s]+$/;
-      if (!nameRegex.test(stringValue)) {
-        return "Name can only contain letters and spaces";
-      }
-    } else {
-      // Check for special characters/symbols (existing validation)
-      const symbolRegex = /[!#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
+
+      // SQL Injection Prevention
+    const sqlInjectionPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
+    if (sqlInjectionPattern.test(stringValue)) {
+      return "Invalid input: Contains potentially harmful characters or keywords";
+    }
+
+    const normalizedColumn = column.toLowerCase();
+    const dataType = dataTypes[column]?.toLowerCase();  
+
+  if (dataType === 'text' || dataType?.includes('character varying')) {  
+    // Symbol validation
+    if (!isSymbolAllowed(normalizedColumn)) {
+      const symbolRegex = /[!@#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
       if (symbolRegex.test(stringValue)) {
-        return "Special characters are not allowed";
+        return "Special characters are not allowed in this field";
+      }
+    }
+  
+    // Number validation
+    if (!isNumberAllowed(normalizedColumn) && !normalizedColumn.includes('id')) {
+      const numberRegex = /\d/;
+      if (numberRegex.test(stringValue)) {
+        return "Numbers are not allowed in this field";
+      }
+    }
+  
+    const stv = String(value);
+    // Space validation
+    if (!isSpaceAllowed(column)) { // New function to check
+      if (stv.includes(' ')) {
+        return "Spaces are not allowed in this field";
       }
     }
 
-    const dataType = dataTypes[column]?.toLowerCase();
+    // Email validation
+    if (normalizedColumn.includes('email')) {
+      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+      if (!emailRegex.test(stringValue)) {
+        return "Please enter a valid email address";
+      }
+    }
+
+    // Number validation
+    if (normalizedColumn.includes('phone') || normalizedColumn.includes('mobile')) {
+      const phoneRegex = /^\+?[\d\s-]{10,}$/;
+      if (!phoneRegex.test(stringValue)) {
+        return "Please enter a valid phone number";
+      }
+    }
+  }
+      
     if (!dataType) return "";
 
     switch (dataType) {
@@ -146,13 +190,17 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   };
 
   const handleChange = (column: string, value: string) => {
+    const sanitizedValue = preventXSS(sanitizeInput(value));
+    console.log('Input value:', value); // Debug log
+    console.log('Sanitized value:', sanitizedValue); // Debug log
+
     setFormData((prev) => ({
       ...prev,
-      [column]: value,
+      [column]: sanitizedValue,
     }));
 
     // Validate and set error
-    const error = validateField(column, value);
+    const error = validateField(column, sanitizedValue);
     setErrors((prev) => ({
       ...prev,
       [column]: error,
@@ -357,7 +405,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         dc.columnName.toLowerCase().replace(/_/g, "") ===
                         normalizedColumn
                     );
-                    const isEditable = isColumnEditable(column);
+                    const isEditable = isColumnEditable(column) && !isPrimaryKey(column);
                     const isDateField = dataTypes[column]?.toLowerCase().includes('date');
                     const existingValue = row?.[column]
                       ? isDateField 

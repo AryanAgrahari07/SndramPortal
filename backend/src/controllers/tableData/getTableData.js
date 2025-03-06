@@ -113,7 +113,7 @@ exports.getTableData = async (req, res) => {
       return acc;
     }, {});
 
-
+    // console.log(dataTypes);
     return res.status(200).json({
       success: true,
       data: result.rows,
