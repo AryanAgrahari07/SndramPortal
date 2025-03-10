@@ -3,7 +3,12 @@ import { X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addTableRow, DropdownConfig } from "@/services/tableDataService";
 import DynamicDropdown from "@/components/ui/DynamicDropdown";
-import {isSymbolAllowed, isNumberAllowed, preventXSS, isSpaceAllowed } from "@/config/ValidationConfig";
+import {
+  isSymbolAllowed,
+  isNumberAllowed,
+  preventXSS,
+  isSpaceAllowed,
+} from "@/config/ValidationConfig";
 import { sanitizeInput } from "@/utils/security";
 
 interface EditRowDrawerProps {
@@ -24,14 +29,14 @@ interface ValidationErrors {
 }
 
 const formatDateForInput = (dateValue: string | null | undefined): string => {
-  if (!dateValue) return '';
-  
+  if (!dateValue) return "";
+
   // Handle both date-only and timestamp formats
   const date = new Date(dateValue);
-  if (isNaN(date.getTime())) return '';
-  
+  if (isNaN(date.getTime())) return "";
+
   // Format as YYYY-MM-DD
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split("T")[0];
 };
 
 export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
@@ -60,7 +65,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     if (row) {
       const editableData = columns.reduce((acc, column) => {
         if (isColumnEditable(column) && !isPrimaryKey(column)) {
-          if (dataTypes[column]?.toLowerCase().includes('date')) {
+          if (dataTypes[column]?.toLowerCase().includes("date")) {
             acc[column] = formatDateForInput(row[column] as string);
           } else {
             acc[column] = row[column] ?? "";
@@ -71,7 +76,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       setFormData(editableData);
     } else {
       const newRowData = columns.reduce((acc, column) => {
-        if (isColumnEditable(column)  && !isPrimaryKey(column)) {
+        if (isColumnEditable(column) && !isPrimaryKey(column)) {
           acc[column] = "";
         }
         return acc;
@@ -88,57 +93,68 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
     const stringValue = String(value).trim();
 
-      // SQL Injection Prevention
-    const sqlInjectionPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
+    // SQL Injection Prevention
+    const sqlInjectionPattern =
+      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
     if (sqlInjectionPattern.test(stringValue)) {
       return "Invalid input: Contains potentially harmful characters or keywords";
     }
 
     const normalizedColumn = column.toLowerCase();
-    const dataType = dataTypes[column]?.toLowerCase();  
+    const dataType = dataTypes[column]?.toLowerCase();
 
-  if (dataType === 'text' || dataType?.includes('character varying')) {  
-    // Symbol validation
-    if (!isSymbolAllowed(normalizedColumn)) {
-      const symbolRegex = /[!@#$%^&*()+=\[\]{};:'"<>/?\\|`~]/;
-      if (symbolRegex.test(stringValue)) {
-        return "Special characters are not allowed in this field";
+    if (dataType === "text" || dataType?.includes("character varying")) {
+      // Symbol validation
+      if (!isSymbolAllowed(normalizedColumn)) {
+        const symbolRegex = /[!@#$%^&*()+=\[\]{};:'"\\|,.<>/?`~\-_]/;
+        if (symbolRegex.test(stringValue)) {
+          return "Special characters are not allowed in this field";
+        }
       }
-    }
-  
-    // Number validation
-    if (!isNumberAllowed(normalizedColumn) && !normalizedColumn.includes('id')) {
-      const numberRegex = /\d/;
-      if (numberRegex.test(stringValue)) {
-        return "Numbers are not allowed in this field";
+
+      // Number validation
+      if (
+        !isNumberAllowed(normalizedColumn) &&
+        !normalizedColumn.includes("id")
+      ) {
+        const numberRegex = /\d/;
+        if (numberRegex.test(stringValue)) {
+          return "Numbers are not allowed in this field";
+        }
       }
-    }
-  
-    const stv = String(value);
-    // Space validation
-    if (!isSpaceAllowed(column)) { // New function to check
-      if (stv.includes(' ')) {
-        return "Spaces are not allowed in this field";
+
+      const stv = String(value);
+      // Space validation
+      if (!isSpaceAllowed(column)) {
+        // New function to check
+        if (stv.includes(" ")) {
+          return "Spaces are not allowed in this field";
+        }
+      }
+
+      // Email validation
+      if (
+        normalizedColumn.includes("email") ||
+        normalizedColumn.includes("mail")
+      ) {
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+        if (!emailRegex.test(stringValue)) {
+          return "Please enter a valid email address";
+        }
+      }
+
+      // Number validation
+      if (
+        normalizedColumn.includes("phone") ||
+        normalizedColumn.includes("mobile")
+      ) {
+        const phoneRegex = /^\+?[\d\s-]{10,}$/;
+        if (!phoneRegex.test(stringValue)) {
+          return "Please enter a valid phone number";
+        }
       }
     }
 
-    // Email validation
-    if (normalizedColumn.includes('email')) {
-      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-      if (!emailRegex.test(stringValue)) {
-        return "Please enter a valid email address";
-      }
-    }
-
-    // Number validation
-    if (normalizedColumn.includes('phone') || normalizedColumn.includes('mobile')) {
-      const phoneRegex = /^\+?[\d\s-]{10,}$/;
-      if (!phoneRegex.test(stringValue)) {
-        return "Please enter a valid phone number";
-      }
-    }
-  }
-      
     if (!dataType) return "";
 
     switch (dataType) {
@@ -157,7 +173,8 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         break;
 
       case "uuid":
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const uuidRegex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(stringValue)) {
           return "Must be a valid UUID";
         }
@@ -191,8 +208,6 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
 
   const handleChange = (column: string, value: string) => {
     const sanitizedValue = preventXSS(sanitizeInput(value));
-    console.log('Input value:', value); // Debug log
-    console.log('Sanitized value:', sanitizedValue); // Debug log
 
     setFormData((prev) => ({
       ...prev,
@@ -219,10 +234,10 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     // First pass: Check for values and validate fields
     Object.entries(formData).forEach(([column, value]) => {
       const stringValue = String(value || "").trim();
-      
+
       if (stringValue !== "") {
         hasAtLeastOneValue = true;
-        
+
         // Validate non-empty fields
         const error = validateField(column, value);
         if (error) {
@@ -238,7 +253,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       Object.entries(formData).forEach(([column, value]) => {
         const stringValue = String(value || "").trim();
         const originalValue = row[column];
-        const isDate = dataTypes[column]?.toLowerCase().includes('date');
+        const isDate = dataTypes[column]?.toLowerCase().includes("date");
 
         if (isDate) {
           const formattedOriginal = formatDateForInput(originalValue as string);
@@ -289,13 +304,16 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     try {
       if (mode === "add") {
         // Remove empty fields before submitting
-        const nonEmptyData = Object.entries(formData).reduce((acc, [key, value]) => {
-          const stringValue = String(value || "").trim();
-          if (stringValue !== "") {
-            acc[key] = value;
-          }
-          return acc;
-        }, {} as Record<string, unknown>);
+        const nonEmptyData = Object.entries(formData).reduce(
+          (acc, [key, value]) => {
+            const stringValue = String(value || "").trim();
+            if (stringValue !== "") {
+              acc[key] = value;
+            }
+            return acc;
+          },
+          {} as Record<string, unknown>
+        );
 
         if (Object.keys(nonEmptyData).length === 0) {
           toast({
@@ -315,24 +333,29 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         });
       } else {
         // For edit mode, only include changed fields
-        const changedData = Object.entries(formData).reduce((acc, [key, value]) => {
-          const stringValue = String(value || "").trim();
-          const originalValue = row?.[key];
-          const isDate = dataTypes[key]?.toLowerCase().includes('date');
-          
-          if (isDate) {
-            const formattedOriginal = formatDateForInput(originalValue as string);
-            if (formattedOriginal !== stringValue && stringValue !== "") {
-              acc[key] = value;
+        const changedData = Object.entries(formData).reduce(
+          (acc, [key, value]) => {
+            const stringValue = String(value || "").trim();
+            const originalValue = row?.[key];
+            const isDate = dataTypes[key]?.toLowerCase().includes("date");
+
+            if (isDate) {
+              const formattedOriginal = formatDateForInput(
+                originalValue as string
+              );
+              if (formattedOriginal !== stringValue && stringValue !== "") {
+                acc[key] = value;
+              }
+            } else {
+              const originalString = String(originalValue || "").trim();
+              if (originalString !== stringValue && stringValue !== "") {
+                acc[key] = value;
+              }
             }
-          } else {
-            const originalString = String(originalValue || "").trim();
-            if (originalString !== stringValue && stringValue !== "") {
-              acc[key] = value;
-            }
-          }
-          return acc;
-        }, {} as Record<string, unknown>);
+            return acc;
+          },
+          {} as Record<string, unknown>
+        );
 
         if (Object.keys(changedData).length === 0) {
           toast({
@@ -399,16 +422,21 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="px-4 py-6 space-y-6 sm:px-6">
                   {columns.map((column) => {
-                    const normalizedColumn = column.toLowerCase().replace(/_/g, "");
+                    const normalizedColumn = column
+                      .toLowerCase()
+                      .replace(/_/g, "");
                     const dropdownConfig = dropdownColumns.find(
                       (dc) =>
                         dc.columnName.toLowerCase().replace(/_/g, "") ===
                         normalizedColumn
                     );
-                    const isEditable = isColumnEditable(column) && !isPrimaryKey(column);
-                    const isDateField = dataTypes[column]?.toLowerCase().includes('date');
+                    const isEditable =
+                      isColumnEditable(column) && !isPrimaryKey(column);
+                    const isDateField = dataTypes[column]
+                      ?.toLowerCase()
+                      .includes("date");
                     const existingValue = row?.[column]
-                      ? isDateField 
+                      ? isDateField
                         ? formatDateForInput(row[column] as string)
                         : String(row[column])
                       : "";
@@ -457,10 +485,12 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                               isEditable
                                 ? formData[column] || ""
                                 : isDateField
-                                  ? formatDateForInput(row?.[column] as string)
-                                  : row?.[column] || ""
+                                ? formatDateForInput(row?.[column] as string)
+                                : row?.[column] || ""
                             )}
-                            onChange={(e) => handleChange(column, e.target.value)}
+                            onChange={(e) =>
+                              handleChange(column, e.target.value)
+                            }
                             className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
                               errors[column]
                                 ? "border-red-300"

@@ -89,25 +89,21 @@ const { getUserEmails } = require("../controllers/userEmails/getUserEmails.js");
 const {
   markNotificationsAsSeen,
 } = require("../controllers/markNotificationsAsSeen/markNotificationsAsSeen.js");
-
+const validateData  = require("../middleware/dataValidation.js");
 const {
   otpVerificationLimiter,
 } = require("../middleware/otpVerificationLimiter");
-
-// const rateLimiter = require("../middleware/rateLimiter");
-
 const { refreshToken } = require("../controllers/refreshToken/refreshToken.js");
-// const { logout } = require("../controllers/auth/logout.js");
+const { bulkUpdate } = require("../controllers/bulkupload/bulkupload.js");
+const validateBulkData  = require("../middleware/bulkdatavalidation.js");
 
-const { checksession } = require("../controllers/checksession/checksession.js");
-
+// refreshing access and refresh token
 router.post("/refresh-token", refreshToken);
 
+//bulk upload using csv file
+router.post("/bulk-update", verifyToken, authorize("maker"), validateBulkData, bulkUpdate );
 
-
-// Change GET to POST since we're sending data
-router.get('/check-session', checksession); 
-
+//mark notifications as seen
 router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 
 // users email data
@@ -131,7 +127,7 @@ router.post("/isactive", verifyToken, authorize("admin"), isActive);
 
 // Data routes - Authenticated users
 router.get("/fetchchangetrackerdata", verifyToken, fetchChangeTrackerData);
-router.post("/requestdata", verifyToken, requestData);
+router.post("/requestdata", verifyToken, validateData, requestData);
 router.get("/table", verifyToken, table);
 router.get("/tableData/:name", verifyToken, tableData);
 
@@ -167,7 +163,7 @@ router.post("/approveall", verifyToken, authorize("checker"), allApprove);
 router.post("/rejectall", verifyToken, authorize("checker"), allReject);
 
 //endpoint to handle add of rows
-router.post("/addrow", verifyToken, authorize("maker"), addRow);
+router.post("/addrow", verifyToken, authorize("maker"), validateData, addRow);
 router.get("/fetchrowrequest", verifyToken, fetchRowRequest);
 router.post("/acceptrow", verifyToken, acceptRow);
 router.post("/rejectrow", verifyToken, rejectRow);

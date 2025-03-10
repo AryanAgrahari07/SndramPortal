@@ -15,6 +15,18 @@ import {
   CellHighlight,
 } from "@/services/highlightService";
 import HighlightedCell from "./ui/HighlightedCell";
+import { Upload, AlertCircle } from "lucide-react";
+import Papa from 'papaparse';
+import { validateCSVData } from "../utils/csvValidation";
+import { API_URL } from "@/config/constants";
+import { preventXSS } from "@/config/ValidationConfig";
+import { sanitizeInput } from "@/utils/security";
+
+interface CSVValidationError {
+  row: number;
+  column: string;
+  message: string;
+}
 
 interface ColumnStatus {
   column_name: string;
@@ -70,6 +82,10 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(false);
   const { toast } = useToast();
   const [highlightedCells, setHighlightedCells] = useState<CellHighlight[]>([]);
+  const [showErrors, setShowErrors] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [csvErrors, setCSVErrors] = useState<CSVValidationError[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Add ref for search input
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -377,6 +393,113 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     );
   }
 
+  // CSV upload handler
+ const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  setIsUploading(true);
+  setCSVErrors([]);
+  setShowErrors(true);
+
+  try {
+    // Validate file type and size
+      if (!file.type && !file.name.endsWith('.csv')) {
+        throw new Error('Please upload a valid CSV file');
+      }
+
+    // Parse CSV file
+    const results = await new Promise<Papa.ParseResult<Record<string, any>>>((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: resolve,
+        error: reject,
+        transformHeader: (header) => header.trim(),
+      });
+    });
+
+    // Validate headers match table columns
+    const csvHeaders = Object.keys(results.data[0] || {}).map(header => header.trim());
+    const invalidHeaders = csvHeaders.filter(header => !columns.includes(header));
+ 
+    if (invalidHeaders.length > 0) {
+      throw new Error(`Invalid columns found: ${invalidHeaders.join(', ')}`);
+    }
+
+     // Using existing dataTypes for validation
+     const columnTypes = columns.map(column => ({
+      column_name: column,
+      data_type: dataTypes[column]|| 'text',
+      character_maximum_length: null
+    }));
+
+    // Validate CSV data
+    const validationErrors = validateCSVData(results.data, columnTypes);
+
+    if (validationErrors.length > 0) {
+      setCSVErrors(validationErrors);
+      setIsUploading(false);
+      return; // Stop here if there are validation errors
+    }
+
+      // Sanitize data before sending to backend
+      const sanitizedData = results.data.map(row => {
+        const sanitizedRow: Record<string, any> = {};
+        Object.entries(row).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            sanitizedRow[key] = preventXSS(sanitizeInput(String(value)));
+          }
+        });
+        return sanitizedRow;
+      });
+
+     // Send validated data to backend
+     const uploadResponse = await fetch(`${API_URL}/bulk-update`, {
+       method: 'POST',
+       headers: { 
+        'Content-Type': 'application/json' ,
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+       },
+       credentials: 'include',
+       body: JSON.stringify({
+         tableName,
+         data: sanitizedData,
+       }),
+     });
+
+     if (!uploadResponse.ok) {
+       throw new Error('Failed to process CSV file');
+     }
+
+     const result = await uploadResponse.json();
+
+     console.log(result);
+     // Show success message
+     toast({
+       title: "Success",
+       description: `Processed ${result.results.updates.length} updates and ${result.results.inserts.length} new entries`,
+     });
+
+     // Refresh table data
+     refreshData();
+
+
+    } catch (error) {
+      console.error('CSV upload error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process CSV file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+      
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-200px)]">
       {error && (
@@ -422,6 +545,67 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
               Search
             </button>
           </div>
+        </div>
+
+
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCSVUpload}
+              ref={fileInputRef}
+              className="hidden"
+              id="csv-upload"
+            />
+            <label
+              htmlFor="csv-upload"
+              className={`
+                inline-flex items-center gap-2 px-4 py-2.5 rounded-lg
+                shadow-sm border border-transparent
+                ${isUploading 
+                  ? 'bg-gray-100 border-gray-200 cursor-not-allowed' 
+                  : 'bg-[#e3f2fd] hover:bg-[#b2ebf2] hover:border-[#00bfa5]/20 cursor-pointer'}
+                transition-all duration-200 group
+              `}
+            >
+              <Upload className={`h-4 w-4 ${isUploading ? 'text-gray-400' : 'text-[#00bfa5] group-hover:scale-110 transition-transform'}`} />
+              <span className={`text-sm font-medium ${isUploading ? 'text-gray-500' : 'text-gray-700'}`}>
+                {isUploading ? 'Uploading...' : 'Upload CSV'}
+              </span>
+            </label>
+          </div>
+          {csvErrors.length > 0 && showErrors && (
+            <div className="mx-4 mb-4 p-4 border border-red-200 rounded-lg bg-red-50/80 backdrop-blur-sm shadow-sm relative">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 text-red-700">
+                  <AlertCircle className="h-4 w-4" />
+                  <h3 className="font-medium">CSV Validation Errors</h3>
+                </div>
+                <button 
+                  onClick={() => setShowErrors(false)}
+                  className="p-1 hover:bg-red-100 rounded-full transition-colors"
+                  aria-label="Close error messages"
+                >
+                  <X className="h-4 w-4 text-red-500" />
+                </button>
+              </div>
+              <div className="max-h-40 overflow-auto scrollbar-thin scrollbar-thumb-red-200 scrollbar-track-transparent pr-2">
+                <ul className="space-y-1.5">
+                  {csvErrors.map((error, index) => (
+                    <li 
+                      key={index} 
+                      className="text-sm text-red-600 flex items-start gap-2"
+                    >
+                      <span className="min-w-[4rem] font-medium">Row {error.row}:</span>
+                      <span className="font-medium">{error.column}</span>
+                      <span className="text-red-500">- {error.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Table Content */}
