@@ -3,7 +3,7 @@ const { isSymbolAllowed } = require('./allowedcolumns/symbolAllowed.js');
 const { isNumberAllowed } = require('./allowedcolumns/numberAllowed.js');
 const { isSpaceAllowed } = require('./allowedcolumns/spaceAllowed.js');
 
-const validateField = async (columnName, value, dataType) => {
+  const validateField = async (columnName, value, dataType) => {
   if (value === null || value === undefined) {
     return null; // Allow null values if the database schema permits
   }
@@ -106,8 +106,9 @@ const getTableSchema = async (tableName) => {
 
 const validateData = async (req, res, next) => {
   try {
-    const { table_name, row_data, new_values } = req.body;
+    const { table_name, row_data, new_values, old_values } = req.body;
     const dataToValidate = row_data || new_values;
+    const oldData = old_values || {}; 
 
     if (!dataToValidate) {
       return next();
@@ -125,7 +126,16 @@ const validateData = async (req, res, next) => {
     const validationErrors = {};
 
     // Validate each field
-    for (const [columnName, value] of Object.entries(dataToValidate)) {
+    for (const [columnName, newValue] of Object.entries(dataToValidate)) {
+      const oldValue = oldData[columnName];
+      
+      // Skip validation if the value hasn't changed
+      if (oldValue === newValue || 
+          (oldValue === null && newValue === '') || 
+          (oldValue === '' && newValue === null)) {
+        continue;
+      }
+
       const columnSchema = tableSchema.find(col => col.column_name === columnName);
       
       if (!columnSchema) {
@@ -134,12 +144,12 @@ const validateData = async (req, res, next) => {
       }
 
       // Skip validation if field is empty and nullable
-      if ((value === null || value === undefined || value === '') && 
-          columnSchema.is_nullable === 'YES') {
+      if ((newValue === null || newValue === undefined || newValue === '' || newValue === 'null' || newValue === 'NULL') && 
+           columnSchema.is_nullable === 'YES') {
         continue;
       }
 
-      const error = await validateField(columnName, value, columnSchema.data_type);
+      const error = await validateField(columnName, newValue, columnSchema.data_type);
       if (error) {
         validationErrors[columnName] = error;
       }

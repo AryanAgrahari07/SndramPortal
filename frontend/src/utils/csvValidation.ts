@@ -35,7 +35,7 @@ export const validateCSVData = (
       }
 
       // Skip validation for null/empty values
-      if (value === null || value === '') return;
+      if (value === null || value === '' || value === 'null' || value === 'NULL') return;
 
       const stringValue = String(value).trim();
       
@@ -151,19 +151,73 @@ export const validateCSVData = (
           break;
 
         case 'date':
+           // Validate date format (YYYY-MM-DD or DD-MM-YYYY)
+           const dateRegexISO = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+           const dateRegexDMY = /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/;
+           
+           if (!dateRegexISO.test(stringValue) && !dateRegexDMY.test(stringValue)) {
+             errors.push({
+               row: rowNumber,
+               column,
+               message: `Must be a valid date in YYYY-MM-DD or DD-MM-YYYY format`,
+             });
+             break;
+           }
+ 
+           // Parse the date based on its format
+           let year: number, month: number, day: number;
+           
+           if (dateRegexISO.test(stringValue)) {
+             [year, month, day] = stringValue.split('-').map(Number);
+           } else {
+             [day, month, year] = stringValue.split('-').map(Number);
+           }
+ 
+           // Validate date values
+           const isValidDate = new Date(year, month - 1, day).getMonth() === month - 1;
+           if (!isValidDate) {
+             errors.push({
+               row: rowNumber,
+               column,
+               message: `Invalid date value`,
+             });
+           }
+           break;
+
         case 'timestamp':
         case 'timestamp without time zone':
         case 'timestamp with time zone':
-          const date = new Date(value);
-          if (isNaN(date.getTime())) {
+           // Validate timestamp format with both date formats
+          const timestampRegexISO = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\s([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?(([+-])([01]\d|2[0-3]):([0-5]\d))?$/;
+          const timestampRegexDMY = /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}\s([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d{1,3})?(([+-])([01]\d|2[0-3]):([0-5]\d))?$/;
+
+          if (!timestampRegexISO.test(stringValue) && !timestampRegexDMY.test(stringValue)) {
             errors.push({
               row: rowNumber,
               column,
-              message: `Must be a valid date`,
+              message: `Must be a valid timestamp in YYYY-MM-DD HH:mm:ss[.SSS][+/-HH:mm] or DD-MM-YYYY HH:mm:ss[.SSS][+/-HH:mm] format`,
+            });
+            break;
+          }
+
+          // Convert DD-MM-YYYY to YYYY-MM-DD format if needed
+          let timestampStr = stringValue;
+          if (timestampRegexDMY.test(stringValue)) {
+            const [datePart, timePart] = stringValue.split(' ');
+            const [day, month, year] = datePart.split('-');
+            timestampStr = `${year}-${month}-${day} ${timePart}`;
+          }
+
+          const timestamp = new Date(timestampStr);
+          if (isNaN(timestamp.getTime())) {
+            errors.push({
+              row: rowNumber,
+              column,
+              message: `Invalid timestamp value`,
             });
           }
           break;
-
+          
         case 'uuid':
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
           if (!uuidRegex.test(stringValue)) {

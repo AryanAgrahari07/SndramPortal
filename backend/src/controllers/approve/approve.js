@@ -79,7 +79,10 @@ exports.approve = async (req, res) => {
         const updates = Object.entries(new_data)
             .filter(([column]) => column !== 'request_id' && column !== 'row_id')
             .map(([column, value]) => {
-                return [column, value];
+             const processedValue = (value === 'null' || value === 'NULL' || value === '') 
+                ? null 
+                : value;
+             return [column, processedValue];
             });
 
         console.log('Prepared updates:', updates);

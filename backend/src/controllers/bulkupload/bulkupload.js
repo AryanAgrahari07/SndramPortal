@@ -32,6 +32,25 @@ exports.bulkUpdate = async (req, res) => {
 
     for (const row of data) {
       try {
+          // Check if row is empty or contains only primary key
+          const nonPrimaryKeyValues = Object.entries(row).filter(([key, value]) => {
+            return key !== primaryKeyColumn && 
+                   value !== null && 
+                   value !== undefined && 
+                   value !== '' &&
+                   value !== 'null' &&
+                   value !== 'NULL';
+          });
+  
+          // Skip if row is empty or has only primary key
+          if (nonPrimaryKeyValues.length === 0) {
+            results.skipped.push({
+              id: row[primaryKeyColumn] || 'unknown',
+              reason: 'Empty row or contains only primary key'
+            });
+            continue;
+          }
+          
         let existingRow = null;
 
         // Check if row exists only if it has a primary key value
@@ -63,7 +82,11 @@ exports.bulkUpdate = async (req, res) => {
             const newValue = String(row[column]);
 
             // Only include if values are different
-            if (oldValue !== newValue) {
+            if ((oldValue !== newValue) && 
+                !(oldValue === null && (newValue === 'null' || newValue === 'NULL' || newValue === '')) && 
+                !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && newValue === null) &&
+                !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && 
+                  (newValue === 'null' || newValue === 'NULL' || newValue === ''))) {
               changes[column] = row[column];
               hasChanges = true;
             }

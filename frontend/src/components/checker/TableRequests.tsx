@@ -253,6 +253,16 @@ export const TableRequests = () => {
 
   const confirmApproveAll = async (rowIds: string[]) => {
     try {
+
+       // Get the request IDs for selected rows
+        const selectedRequests = requests
+        .filter(req => rowIds.includes(req.row_id))
+        .map(req => ({
+          row_id: req.row_id,
+          request_id: req.request_id
+        }));
+
+        
        const response = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.APPROVE_ALL}`,
         {
@@ -263,7 +273,7 @@ export const TableRequests = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            row_ids: rowIds,
+            requests: selectedRequests,
           }),
         }
       );
@@ -302,6 +312,14 @@ export const TableRequests = () => {
     }
 
     try {
+        // Get the request IDs for selected rows
+        const selectedRequests = requests
+        .filter(req => rowIds.includes(req.row_id))
+        .map(req => ({
+          row_id: req.row_id,
+          request_id: req.request_id
+        }));
+
       const response = await fetch(
         `${API_URL}${ENDPOINTS.CHECKER.REJECT_ALL}`,
         {
@@ -312,7 +330,7 @@ export const TableRequests = () => {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
-            row_ids: rowIds,
+            requests: selectedRequests,
             comments: rejectComment,
           }),
         }
@@ -329,6 +347,12 @@ export const TableRequests = () => {
         setRejectComment("");
         setIsBulkReject(false);
         fetchRequests();
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to reject requests",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.log(error);

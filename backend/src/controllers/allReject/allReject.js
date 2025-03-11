@@ -1,17 +1,25 @@
 const { client_update } = require('../../configuration/database/databaseUpdate.js');
 
 exports.allReject = async (req, res) => {
-    const { row_ids, comments } = req.body;
+    const { requests, comments } = req.body;
     const checker = req.user.user_id;
 
-    console.log('Received row_ids:', row_ids);
+    console.log('Received requests:', requests);
 
-    if (!row_ids || !Array.isArray(row_ids) || row_ids.length === 0) {
+    if (!requests || !Array.isArray(requests) || requests.length === 0) {
         return res.status(400).json({
             success: false,
-            message: 'row_ids must be a non-empty array.',
+            message: 'requests must be a non-empty array.',
         });
     }
+
+    if (!comments || typeof comments !== 'string' || comments.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            message: 'Comments are required for rejection'
+        });
+    }
+
 
     try {
         await client_update.query('BEGIN');
@@ -20,26 +28,27 @@ exports.allReject = async (req, res) => {
         const errors = [];
 
         // Process each row_id
-        for (const row_id of row_ids) {
+        for (const { row_id, request_id } of requests) {
             try {
                 // Get the change details
                 const selectQuery = `
                     SELECT ct.table_name, ct.new_data, ct.request_id::text as request_id
                     FROM app.change_tracker ct
                     WHERE ct.row_id = $1
+                    AND ct.request_id = $2
                     AND ct.status = 'pending';
                 `;
-                const selectResult = await client_update.query(selectQuery, [row_id]);
+                const selectResult = await client_update.query(selectQuery, [row_id, request_id ]);
 
                 if (selectResult.rowCount === 0) {
                     throw new Error(`No pending record found with row_id: ${row_id}`);
                 }
 
-                const { request_id } = selectResult.rows[0];
+                // const { request_id } = selectResult.rows[0];
 
-                if (!request_id) {
-                    throw new Error(`Invalid data in change_tracker for row_id: ${row_id}. Missing request_id.`);
-                }
+                // if (!request_id) {
+                //     throw new Error(`Invalid data in change_tracker for row_id: ${row_id}. Missing request_id.`);
+                // }
 
                 // Update change_tracker status
                 const updateTrackerQuery = `
@@ -50,10 +59,12 @@ exports.allReject = async (req, res) => {
                         updated_at = NOW(),
                         checker = $3
                     WHERE row_id = $4
+                    AND request_id = $5
+                    AND status = 'pending'
                     RETURNING *;
                 `;
 
-                const trackerValues = ['rejected', comments || null, checker, row_id];
+                const trackerValues = ['rejected', comments || null, checker, row_id, request_id];
                 const trackerResult = await client_update.query(updateTrackerQuery, trackerValues);
 
                 if (trackerResult.rowCount === 0) {
@@ -62,6 +73,7 @@ exports.allReject = async (req, res) => {
 
                 results.push({
                     row_id,
+                    request_id,
                     success: true,
                     message: 'Rejected successfully',
                     trackerData: trackerResult.rows[0]
@@ -77,7 +89,7 @@ exports.allReject = async (req, res) => {
         }
 
         // Check if all requests failed
-        if (errors.length === row_ids.length) {
+        if (errors.length === requests.length) {
             // If all requests failed, rollback
             await client_update.query('ROLLBACK');
             return res.status(500).json({
@@ -93,7 +105,7 @@ exports.allReject = async (req, res) => {
         const successCount = results.filter(result => result.success).length;
         return res.status(200).json({
             success: true,
-            message: `Successfully processed ${successCount} out of ${row_ids.length} rejections`,
+            message: `Successfully processed ${successCount} out of ${requests.length} rejections`,
             results,
             errors: errors.length > 0 ? errors : undefined
         });
