@@ -15,8 +15,8 @@ import {
   CellHighlight,
 } from "@/services/highlightService";
 import HighlightedCell from "./ui/HighlightedCell";
-import { Upload, AlertCircle } from "lucide-react";
-import Papa from 'papaparse';
+import { Upload, AlertCircle, Download } from "lucide-react";
+import Papa from "papaparse";
 import { validateCSVData } from "../utils/csvValidation";
 import { API_URL } from "@/config/constants";
 import { preventXSS } from "@/config/ValidationConfig";
@@ -394,112 +394,132 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   }
 
   // CSV upload handler
- const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
+  const handleCSVUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  setIsUploading(true);
-  setCSVErrors([]);
-  setShowErrors(true);
+    setIsUploading(true);
+    setCSVErrors([]);
+    setShowErrors(true);
 
-  try {
-    // Validate file type and size
-      if (!file.type && !file.name.endsWith('.csv')) {
-        throw new Error('Please upload a valid CSV file');
+    try {
+      // Validate file type and size
+      if (!file.type && !file.name.endsWith(".csv")) {
+        throw new Error("Please upload a valid CSV file");
       }
 
-    // Parse CSV file
-    const results = await new Promise<Papa.ParseResult<Record<string, any>>>((resolve, reject) => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: resolve,
-        error: reject,
-        transformHeader: (header) => header.trim(),
-      });
-    });
+      // Parse CSV file
+      const results = await new Promise<Papa.ParseResult<Record<string, any>>>(
+        (resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: resolve,
+            error: reject,
+            transformHeader: (header) => header.trim(),
+          });
+        }
+      );
 
-    // Validate headers match table columns
-    const csvHeaders = Object.keys(results.data[0] || {}).map(header => header.trim());
-    const invalidHeaders = csvHeaders.filter(header => !columns.includes(header));
- 
-    if (invalidHeaders.length > 0) {
-      throw new Error(`Invalid columns found: ${invalidHeaders.join(', ')}`);
-    }
+      // Validate headers match table columns
+      const csvHeaders = Object.keys(results.data[0] || {}).map((header) =>
+        header.trim()
+      );
+      const invalidHeaders = csvHeaders.filter(
+        (header) => !columns.includes(header)
+      );
 
-     // Using existing dataTypes for validation
-     const columnTypes = columns.map(column => ({
-      column_name: column,
-      data_type: dataTypes[column]|| 'text',
-      character_maximum_length: null
-    }));
+      if (invalidHeaders.length > 0) {
+        throw new Error(`Invalid columns found: ${invalidHeaders.join(", ")}`);
+      }
 
-    // Validate CSV data
-    const validationErrors = validateCSVData(results.data, columnTypes);
+      // Using existing dataTypes for validation
+      const columnTypes = columns.map((column) => ({
+        column_name: column,
+        data_type: dataTypes[column] || "text",
+        character_maximum_length: null,
+      }));
 
-    if (validationErrors.length > 0) {
-      setCSVErrors(validationErrors);
-      setIsUploading(false);
-      return; // Stop here if there are validation errors
-    }
+      // Validate CSV data
+      const validationErrors = validateCSVData(results.data, columnTypes);
+
+      if (validationErrors.length > 0) {
+        setCSVErrors(validationErrors);
+        setIsUploading(false);
+        return; // Stop here if there are validation errors
+      }
 
       // Sanitize data before sending to backend
-      const sanitizedData = results.data.map(row => {
+      const sanitizedData = results.data.map((row) => {
         const sanitizedRow: Record<string, any> = {};
         Object.entries(row).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== '') {
+          if (value !== null && value !== undefined && value !== "") {
             sanitizedRow[key] = preventXSS(sanitizeInput(String(value)));
           }
         });
         return sanitizedRow;
       });
 
-     // Send validated data to backend
-     const uploadResponse = await fetch(`${API_URL}/bulk-update`, {
-       method: 'POST',
-       headers: { 
-        'Content-Type': 'application/json' ,
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-       },
-       credentials: 'include',
-       body: JSON.stringify({
-         tableName,
-         data: sanitizedData,
-       }),
-     });
+      // Send validated data to backend
+      const uploadResponse = await fetch(`${API_URL}/bulk-update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          tableName,
+          data: sanitizedData,
+        }),
+      });
 
-     if (!uploadResponse.ok) {
-       throw new Error('Failed to process CSV file');
-     }
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to process CSV file");
+      }
 
-     const result = await uploadResponse.json();
+      const result = await uploadResponse.json();
 
-     console.log(result);
-     // Show success message
-     toast({
-       title: "Success",
-       description: `Processed ${result.results.updates.length} updates and ${result.results.inserts.length} new entries`,
-     });
+      console.log(result);
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Processed ${result.results.updates.length} updates and ${result.results.inserts.length} new entries`,
+      });
 
-     // Refresh table data
-     refreshData();
-
-
+      // Refresh table data
+      refreshData();
     } catch (error) {
-      console.error('CSV upload error:', error);
+      console.error("CSV upload error:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to process CSV file",
+        description:
+          error instanceof Error ? error.message : "Failed to process CSV file",
         variant: "destructive",
       });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
-      
+
+  const handleExportTemplate = () => {
+    if (!columns.length) return;
+    
+    // Create CSV content with headers only
+    const csvContent = columns.join(',');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${tableName || 'table'}_template.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-200px)]">
       {error && (
@@ -507,49 +527,88 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
       )}
       <div className="flex flex-col flex-1 bg-white rounded-lg border border-[#e3f2fd] overflow-hidden">
         {/* Search and Filter Controls */}
-        <div className="relative flex items-center w-full mb-4">
-          {/* Search and Filter Toggle Row */}
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+        <div className="px-6 py-4 border-b border-[#e3f2fd] bg-white/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-4">
+            {/* Search Box Container */}
+            <div className="flex-1 max-w-8xl relative">
+              <div className="relative flex items-center w-full shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search in all columns..."
+                  value={searchInput}
+                  onChange={handleSearch}
+                  className="w-full pl-11 pr-28 h-11 bg-white border border-[#e3f2fd] rounded-lg 
+                focus:outline-none focus:border-[#00bfa5] focus:ring-[1px] focus:ring-[#00bfa5]/20 
+                text-sm transition-all duration-200"
+                />
+                {/* Search Controls Overlay */}
+                <div className="absolute right-0 inset-y-0 flex items-center">
+                  {searchInput && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="h-full px-2.5 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  <div className="h-[calc(100%-8px)] w-[1px] bg-[#e3f2fd] mx-1" />
+                  <button
+                    onClick={handleSearchClick}
+                    disabled={!searchInput.trim()}
+                    className={`
+                  h-9 px-4 mr-1 rounded-md text-sm font-medium 
+                  transition-all duration-200 flex items-center gap-2
+                  ${
+                    searchInput.trim()
+                      ? "bg-[#00bfa5] text-white hover:bg-[#00bfa5]/90 shadow-sm"
+                      : "bg-gray-50 text-gray-400 cursor-not-allowed"
+                  }
+                `}
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
             </div>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search in all columns..."
-              value={searchInput}
-              onChange={handleSearch}
-              className="w-full pl-10 pr-[5.5rem] py-2.5 border border-[#e3f2fd] rounded-lg focus:outline-none focus:border-[#00bfa5] focus:ring-1 focus:ring-[#00bfa5]/10 text-sm"
-            />
-          </div>
-          <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1">
-            {searchInput && (
-              <button
-                onClick={handleClearSearch}
-                className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-                title="Clear search"
-              >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-              </button>
-            )}
+
             <button
-              onClick={handleSearchClick}
-              disabled={!searchInput.trim()}
-              className={`mr-1 px-3 py-1 rounded-md text-sm font-medium transition-colors
-          ${
-            searchInput.trim()
-              ? "bg-[#00bfa5] text-white hover:bg-[#00bfa5]/90"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          }`}
+              onClick={handleExportTemplate}
+              disabled={!columns.length}
+              className={`
+                inline-flex items-center gap-2 px-4 h-11 rounded-lg 
+                border border-[#e3f2fd] shadow-sm
+                ${!columns.length
+                  ? "bg-gray-100 border-gray-200 cursor-not-allowed"
+                  : "bg-[#00bfa5]/10 border-[#00bfa5]/20 hover:bg-[#00bfa5]/20 cursor-pointer"
+                }
+                transition-all duration-200 group whitespace-nowrap
+              `}
             >
-              Search
+              <Download
+                className={`h-4 w-4 
+                  ${!columns.length
+                    ? "text-gray-400"
+                    : "text-[#00bfa5] group-hover:scale-110 transition-transform"
+                  }`}
+              />
+              <span
+                className={`text-sm font-medium 
+                  ${!columns.length
+                    ? "text-gray-400"
+                    : "text-gray-600 group-hover:text-gray-800"
+                  }
+                `}
+              >
+                Download Template
+              </span>
             </button>
-          </div>
-        </div>
 
-
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
+            {/* CSV Upload Button */}
             <input
               type="file"
               accept=".csv"
@@ -561,20 +620,43 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
             <label
               htmlFor="csv-upload"
               className={`
-                inline-flex items-center gap-2 px-4 py-2.5 rounded-lg
-                shadow-sm border border-transparent
-                ${isUploading 
-                  ? 'bg-gray-100 border-gray-200 cursor-not-allowed' 
-                  : 'bg-[#e3f2fd] hover:bg-[#b2ebf2] hover:border-[#00bfa5]/20 cursor-pointer'}
-                transition-all duration-200 group
-              `}
+            inline-flex items-center gap-2 px-4 h-11 rounded-lg 
+            border border-[#e3f2fd] shadow-sm
+            ${
+              isUploading
+                ? "bg-gray-100 border-gray-200 cursor-not-allowed"
+                : "bg-[#00bfa5]/10 border-[#00bfa5]/20 hover:bg-[#00bfa5]/20 cursor-pointer"
+            }
+            border shadow-sm
+            transition-all duration-200 group whitespace-nowrap
+          `}
             >
-              <Upload className={`h-4 w-4 ${isUploading ? 'text-gray-400' : 'text-[#00bfa5] group-hover:scale-110 transition-transform'}`} />
-              <span className={`text-sm font-medium ${isUploading ? 'text-gray-500' : 'text-gray-700'}`}>
-                {isUploading ? 'Uploading...' : 'Upload CSV'}
+              <Upload
+                className={`h-4 w-4 
+              ${
+                isUploading
+                  ? "text-gray-400"
+                  : "text-[#00bfa5] group-hover:scale-110 transition-transform"
+              }`}
+              />
+              <span
+                className={`text-sm font-medium 
+            ${
+              isUploading
+                ? "text-gray-400"
+                : "text-gray-600 group-hover:text-gray-800"
+            }
+          `}
+              >
+                {isUploading ? "Uploading..." : "Upload CSV"}
               </span>
             </label>
           </div>
+        </div>
+
+        {/* Rest of the content */}
+
+        <div className="space-y-4">
           {csvErrors.length > 0 && showErrors && (
             <div className="mx-4 mb-4 p-4 border border-red-200 rounded-lg bg-red-50/80 backdrop-blur-sm shadow-sm relative">
               <div className="flex items-center justify-between gap-2 mb-3">
@@ -582,7 +664,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
                   <AlertCircle className="h-4 w-4" />
                   <h3 className="font-medium">CSV Validation Errors</h3>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowErrors(false)}
                   className="p-1 hover:bg-red-100 rounded-full transition-colors"
                   aria-label="Close error messages"
@@ -593,11 +675,13 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
               <div className="max-h-40 overflow-auto scrollbar-thin scrollbar-thumb-red-200 scrollbar-track-transparent pr-2">
                 <ul className="space-y-1.5">
                   {csvErrors.map((error, index) => (
-                    <li 
-                      key={index} 
+                    <li
+                      key={index}
                       className="text-sm text-red-600 flex items-start gap-2"
                     >
-                      <span className="min-w-[4rem] font-medium">Row {error.row}:</span>
+                      <span className="min-w-[4rem] font-medium">
+                        Row {error.row}:
+                      </span>
                       <span className="font-medium">{error.column}</span>
                       <span className="text-red-500">- {error.message}</span>
                     </li>

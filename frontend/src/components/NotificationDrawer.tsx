@@ -38,6 +38,8 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const userRole = role;
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   const handleClose = async () => {
     if (userRole === "admin") {
@@ -111,18 +113,56 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   };
 
   const filteredNotifications = React.useMemo(() => {
+    let filtered = notifications;
+
+    // Apply date filtering only for approved and rejected tabs
+    if (
+      (activeTab === "approved" || activeTab === "rejected") &&
+      (startDate || endDate)
+    ) {
+      filtered = filtered.filter((notification) => {
+        const notificationDate = new Date(notification.updated_at);
+
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          // Set end date to end of day
+          end.setHours(23, 59, 59, 999);
+          return notificationDate >= start && notificationDate <= end;
+        }
+
+        if (startDate) {
+          const start = new Date(startDate);
+          return notificationDate >= start;
+        }
+
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          return notificationDate <= end;
+        }
+
+        return true;
+      });
+    }
+
     if (userRole === "checker") {
       // For checker role, filtering to show only unread notifications
-      return notifications.filter(
+      return filtered.filter(
         (n) => n.status.toLowerCase() === "pending" && !n.checkerseen
       );
     } else if (activeTab === "all") {
-      return notifications.filter((n) =>
+      return filtered.filter((n) =>
         userRole === "maker" ? !n.makerseen : true
       );
     }
-    return notifications.filter((n) => n.status.toLowerCase() === activeTab);
-  }, [notifications, activeTab, userRole]);
+    return filtered.filter((n) => n.status.toLowerCase() === activeTab);
+  }, [notifications, activeTab, userRole, startDate, endDate]);
+
+  const clearDateFilters = () => {
+    setStartDate("");
+    setEndDate("");
+  };
 
   const getNotificationCounts = () => {
     if (userRole === "admin") {
@@ -410,35 +450,83 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           <SheetHeader className="border-b pb-4">
             <SheetTitle>Notifications</SheetTitle>
             {role === "maker" && (
-              <Tabs
-                defaultValue="all"
-                value={activeTab}
-                onValueChange={(value) =>
-                  setActiveTab(value as typeof activeTab)
-                }
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-3 p-1 bg-gray-100 rounded-lg">
-                  <TabsTrigger
-                    value="all"
-                    className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    Unread ({getNotificationCounts().all})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="approved"
-                    className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    Approved ({getNotificationCounts().approved})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="rejected"
-                    className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                  >
-                    Rejected ({getNotificationCounts().rejected})
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="space-y-4">
+                <Tabs
+                  defaultValue="all"
+                  value={activeTab}
+                  onValueChange={(value) => {
+                    setActiveTab(value as typeof activeTab);
+                    if (value === "all") {
+                      clearDateFilters();
+                    }
+                  }}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-3 p-1 bg-gray-100 rounded-lg">
+                    <TabsTrigger
+                      value="all"
+                      className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    >
+                      Unread ({getNotificationCounts().all})
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="approved"
+                      className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    >
+                      Approved ({getNotificationCounts().approved})
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="rejected"
+                      className="text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    >
+                      Rejected ({getNotificationCounts().rejected})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                {/* Date filters for approved and rejected tabs */}
+                {(activeTab === "approved" || activeTab === "rejected") && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="flex-1">
+                        <label className="block text-gray-600 text-xs mb-1">
+                          From Date
+                        </label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="w-full px-2 py-1 border rounded-md text-sm"
+                          max={endDate || undefined}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-gray-600 text-xs mb-1">
+                          To Date
+                        </label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="w-full px-2 py-1 border rounded-md text-sm"
+                          min={startDate || undefined}
+                        />
+                      </div>
+                      {(startDate || endDate) && (
+                        <button
+                        onClick={clearDateFilters}
+                        className="flex items-center px-2.5 py-1.5 mt-6 text-xs font-medium rounded-md 
+                          bg-blue-50 text-blue-600 hover:bg-blue-100 
+                          transition-colors duration-200 border border-blue-200"
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> 
+                        Clear 
+                      </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </SheetHeader>
 
