@@ -85,5 +85,7 @@ export const SPACE_ALLOWED_COLUMNS = [
   "rh_name",
   "ah_name",
   "new_sales",
-  'riacode'
+  'riacode',
+  'zone_name',
+  'arn_code',
 ] as const;

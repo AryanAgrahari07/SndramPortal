@@ -89,7 +89,9 @@ const SpaceColumns = [
     "rh_name",
     "ah_name",
     "new_sales",
-    'riacode'
+    'riacode',
+    'zone_name',
+    'arn_code'
 ];
 
 const isSpaceAllowed = (columnName) => {
