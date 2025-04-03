@@ -10,7 +10,7 @@ const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     "rowRequests" | "configuration" | "userManagement"
   >("rowRequests");
-  const firstName = localStorage.getItem("firstName") || "Admin";
+  // const firstName = localStorage.getItem("firstName") || "Admin";
 
   const selectTable = searchParams.get("table");
   useEffect(() => {

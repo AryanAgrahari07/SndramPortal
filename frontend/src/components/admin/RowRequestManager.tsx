@@ -144,6 +144,47 @@ export default function RowRequestManager({
   const [selectedMaker, setSelectedMaker] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isDateFilterDialogOpen, setIsDateFilterDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+
+  // function to filter by date range
+  const filterByDateRange = (requests: any[]) => {
+    if (!dateRange) return requests;
+    
+    return requests.filter((request) => {
+      const requestDate = new Date(request.created_at);
+
+       // If only start date is selected
+      if (dateRange.start && !dateRange.end) {
+        const startDate = new Date(dateRange.start);
+        return requestDate >= startDate;
+      }
+
+       // If only end date is selected
+      if (!dateRange.start && dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+        return requestDate <= endDate;
+      }
+
+      // If both dates are selected
+      if (dateRange.start && dateRange.end) {
+        const startDate = new Date(dateRange.start);
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end date
+        return requestDate >= startDate && requestDate <= endDate;
+      }
+      
+      return true;
+    });
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange]);
 
   // Get unique makers for the selected table
   const getMakersForSelectedTable = () => {
@@ -175,6 +216,9 @@ export default function RowRequestManager({
     if (selectedTable) {
       result = result.filter((req) => req.table_name === selectedTable);
     }
+
+    // Apply date range filter
+      result = filterByDateRange(result);
 
     // Apply sorting
     if (sortConfig) {
@@ -217,15 +261,6 @@ export default function RowRequestManager({
     }
   }, [selectTable]);
 
-  // Get unique table names from requests
-  // const uniqueTableNames = Array.from(
-  //   new Set(requests.map((req) => req.table_name))
-  // ).sort();
-
-  // // Filter requests based on selected table
-  // const filteredRequests = selectedTable
-  //   ? requests.filter((req) => req.table_name === selectedTable)
-  //   : requests;
 
   useEffect(() => {
     fetchRequests();
@@ -765,8 +800,127 @@ export default function RowRequestManager({
                     />
                   </div>
                 </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDateFilterDialogOpen(true);
+                    }}
+                    className={`ml-1 p-1 rounded transition-colors duration-200 ${
+                      dateRange
+                        ? "bg-[#00bfa5]/10 text-[#00bfa5] hover:bg-[#00bfa5]/20"
+                        : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    }`}
+                  >
+                    <Filter className="h-4 w-4" />
+                  </button>
               </div>
             </TableHead>
+
+
+            <Dialog
+                open={isDateFilterDialogOpen}
+                onOpenChange={setIsDateFilterDialogOpen}
+              >
+                <DialogContent className="sm:max-w-[425px] p-0">
+                  <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                    <DialogTitle className="text-lg font-semibold text-gray-900">
+                      Filter by Date Range
+                    </DialogTitle>
+                  </DialogHeader>
+
+                  <div className="p-6">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="start-date"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="start-date"
+              value={dateRange?.start || ""}
+              onChange={(e) => {
+                setDateRange(prev => ({
+                  ...prev || { end: "" },
+                  start: e.target.value
+                }));
+              }}
+              className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="end-date"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              End Date
+            </label>
+            <input
+              type="date"
+              id="end-date"
+              value={dateRange?.end || ""}
+              onChange={(e) => {
+                setDateRange(prev => ({
+                  ...prev || { start: "" },
+                  end: e.target.value
+                }));
+              }}
+              className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
+            />
+          </div>
+        </div>
+        
+        {dateRange && (dateRange.start || dateRange.end) && (
+          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                Selected Range:
+              </span>
+              <span className="text-sm font-medium text-gray-900">
+                {dateRange.start && new Date(dateRange.start).toLocaleDateString()} - 
+                {dateRange.end && new Date(dateRange.end).toLocaleDateString()}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setDateRange(null);
+                setIsDateFilterDialogOpen(false);
+              }}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg flex justify-end gap-3">
+      <button
+        onClick={() => setIsDateFilterDialogOpen(false)}
+        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={() => setIsDateFilterDialogOpen(false)}
+        className="px-4 py-2 text-sm font-medium text-white bg-[#00bfa5] rounded-md hover:bg-[#00bfa5]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+      >
+        Apply
+      </button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+
+
+
+
 
             <TableHead>View</TableHead>
           </TableRow>
@@ -858,8 +1012,6 @@ export default function RowRequestManager({
       </Table>
 
 
-
-
    {totalPages > 0 && (
       <div className="border-t border-[#e3f2fd] bg-white py-3 px-4">
         <div className="flex items-center justify-between">
@@ -918,8 +1070,6 @@ export default function RowRequestManager({
         </div>
       </div>
 )}
-
-
 
 
       {/* Bulk Actions */}
