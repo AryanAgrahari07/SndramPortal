@@ -23,12 +23,12 @@ const AdminPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-6 space-y-6">
-        <div>
+        {/* <div>
           <h1 className="text-3xl">
             Hello, <span className="text-orange-500">{firstName}</span>
           </h1>
           <p className="text-gray-600 mt-1">Admin dashboard</p>
-        </div>
+        </div> */}
 
         {/* Navigation Tabs */}
         <div className="border-b">

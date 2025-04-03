@@ -81,7 +81,7 @@ exports.verifyOTP = async (req, res) => {
             FROM app."OTP_tracker"
             WHERE email = $1 
             AND "OTP_disable" = false
-            AND created_at >= NOW() - INTERVAL '30 seconds'
+            AND created_at >= NOW() - INTERVAL '40 seconds'
             LIMIT 1;
         `;
 
@@ -236,7 +236,7 @@ exports.verifyOTP = async (req, res) => {
                 FROM app."OTP_tracker"
                 WHERE email = $1 
                 AND "OTP_disable" = false
-                AND created_at < NOW() - INTERVAL '30 seconds'
+                AND created_at < NOW() - INTERVAL '40 seconds'
                 LIMIT 1;
             `;
 

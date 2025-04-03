@@ -9,7 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Check, X, Eye } from "lucide-react";
+import {
+  Check,
+  X,
+  Eye,
+  ChevronUp,
+  ChevronDown,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -104,12 +113,13 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
   );
 };
 
-
 interface RowRequestManagerProps {
   selectTable?: string | null;
 }
 
-export default function RowRequestManager({ selectTable }: RowRequestManagerProps) {
+export default function RowRequestManager({
+  selectTable,
+}: RowRequestManagerProps) {
   const [requests, setRequests] = useState<RowRequest[]>([]);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [viewingData, setViewingData] = useState<RowData | null>(null);
@@ -122,27 +132,100 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
   const { toast } = useToast();
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
-    requestId: '',
+    requestId: "",
     isBulk: false,
   });
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
-  
-  useEffect(() => {
-    if (selectTable) {
-      setSelectedTable(selectTable);
-    }
-  }, [selectTable]);
+  const [sortConfig, setSortConfig] = useState<{
+    key: "maker_email" | "table_name" | "created_at";
+    direction: "asc" | "desc";
+  } | null>(null);
+  const [selectedMaker, setSelectedMaker] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Get unique makers for the selected table
+  const getMakersForSelectedTable = () => {
+    if (!selectedTable) return [];
+    return Array.from(
+      new Set(
+        requests
+          .filter((req) => req.table_name === selectedTable)
+          .map((req) => req.maker_email)
+      )
+    ).sort();
+  };
 
   // Get unique table names from requests
   const uniqueTableNames = Array.from(
     new Set(requests.map((req) => req.table_name))
   ).sort();
 
-  // Filter requests based on selected table
-  const filteredRequests = selectedTable
-    ? requests.filter((req) => req.table_name === selectedTable)
-    : requests;
+  // Sort and filter requests
+  const getSortedAndFilteredRequests = () => {
+    let result = [...requests];
+
+    // Apply maker filter
+    if (selectedMaker) {
+      result = result.filter((req) => req.maker_email === selectedMaker);
+    }
+
+    // Apply table filter
+    if (selectedTable) {
+      result = result.filter((req) => req.table_name === selectedTable);
+    }
+
+    // Apply sorting
+    if (sortConfig) {
+      result.sort((a, b) => {
+        if (sortConfig.key === "created_at") {
+          const dateA = new Date(a[sortConfig.key]).getTime();
+          const dateB = new Date(b[sortConfig.key]).getTime();
+          return sortConfig.direction === "asc" ? dateA - dateB : dateB - dateA;
+        }
+
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return result;
+  };
+
+  const handleSort = (key: "maker_email" | "table_name" | "created_at") => {
+    setSortConfig((current) => {
+      if (current?.key === key) {
+        if (current.direction === "asc") {
+          return { key, direction: "desc" };
+        } else if (current.direction === "desc") {
+          return null; // Reset to no sorting
+        }
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  useEffect(() => {
+    if (selectTable) {
+      setSelectedTable(selectTable);
+    }
+  }, [selectTable]);
+
+  // Get unique table names from requests
+  // const uniqueTableNames = Array.from(
+  //   new Set(requests.map((req) => req.table_name))
+  // ).sort();
+
+  // // Filter requests based on selected table
+  // const filteredRequests = selectedTable
+  //   ? requests.filter((req) => req.table_name === selectedTable)
+  //   : requests;
 
   useEffect(() => {
     fetchRequests();
@@ -184,15 +267,13 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
     }
   };
 
-
-   const handleAccept = async (requestId: string) => {
+  const handleAccept = async (requestId: string) => {
     setConfirmDialog({
       isOpen: true,
       requestId,
       isBulk: false,
     });
   };
-
 
   const handleConfirmAccept = async (requestId: string) => {
     try {
@@ -281,11 +362,10 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
     });
   };
 
-
   const handleBulkAccept = () => {
     setConfirmDialog({
       isOpen: true,
-      requestId: '',
+      requestId: "",
       isBulk: true,
     });
   };
@@ -368,6 +448,26 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
     }
   };
 
+   // Update filteredRequests to use the new function
+   const filteredRequests = getSortedAndFilteredRequests();
+
+   
+   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [selectedTable, selectedMaker, sortConfig]);
+
+  
+   const getPaginatedData = () => {
+    if (filteredRequests.length === 0) return [];
+
+     const startIndex = (currentPage - 1) * itemsPerPage;
+     const endIndex = startIndex + itemsPerPage;
+     return filteredRequests.slice(startIndex, endIndex);
+   };
+ 
+   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+ 
+
   return (
     <div className="space-y-4">
       {/* Table Tabs */}
@@ -375,7 +475,10 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
         {uniqueTableNames.map((tableName) => (
           <button
             key={tableName}
-            onClick={() => setSelectedTable(tableName)}
+            onClick={() => {
+              setSelectedTable(tableName);
+              setSelectedMaker(null);
+            }}
             className={`
               px-4 py-2 rounded-md text-sm font-medium transition-colors
               ${
@@ -414,10 +517,257 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
               />
             </TableHead>
             <TableHead className="w-[100px]">Action</TableHead>
-            <TableHead>Table</TableHead>
-            <TableHead>Maker</TableHead>
+            <TableHead
+              className="cursor-pointer"
+              onClick={() => handleSort("table_name")}
+            >
+              <div className="flex items-center gap-1">
+                Table
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      sortConfig?.key === "table_name" &&
+                      sortConfig.direction === "asc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                  >
+                    <ChevronUp
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "table_name" &&
+                        sortConfig.direction === "asc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      sortConfig?.key === "table_name" &&
+                      sortConfig.direction === "desc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                  >
+                    <ChevronDown
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "table_name" &&
+                        sortConfig.direction === "desc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TableHead>
+
+            <TableHead
+              className="cursor-pointer"
+              onClick={() => handleSort("maker_email")}
+            >
+              <div className="flex items-center gap-1">
+                Maker
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                      ${
+                        sortConfig?.key === "maker_email" &&
+                        sortConfig.direction === "asc"
+                          ? "bg-[#00bfa5] p-0.5"
+                          : ""
+                      }`}
+                  >
+                    <ChevronUp
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "maker_email" &&
+                        sortConfig.direction === "asc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                      ${
+                        sortConfig?.key === "maker_email" &&
+                        sortConfig.direction === "desc"
+                          ? "bg-[#00bfa5] p-0.5"
+                          : ""
+                      }`}
+                  >
+                    <ChevronDown
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "maker_email" &&
+                        sortConfig.direction === "desc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFilterDialogOpen(true);
+                  }}
+                  className={`ml-1 p-1 rounded transition-colors duration-200 ${
+                    selectedMaker
+                      ? "bg-[#00bfa5]/10 text-[#00bfa5] hover:bg-[#00bfa5]/20"
+                      : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
+              </div>
+            </TableHead>
+
+            {/* Filter Dialog */}
+            <Dialog
+              open={isFilterDialogOpen}
+              onOpenChange={setIsFilterDialogOpen}
+            >
+              <DialogContent className="sm:max-w-[425px] p-0">
+                <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                  <DialogTitle className="text-lg font-semibold text-gray-900">
+                    Filter by Maker
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label
+                        htmlFor="maker-filter"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
+                        Select Maker
+                      </label>
+                      <select
+                        id="maker-filter"
+                        value={selectedMaker || ""}
+                        onChange={(e) => {
+                          setSelectedMaker(e.target.value || null);
+                          setIsFilterDialogOpen(false);
+                        }}
+                        className="w-full appearance-none bg-white pl-3 pr-10 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
+                      >
+                        <option value="">All Makers</option>
+                        {getMakersForSelectedTable().map((maker) => (
+                          <option key={maker} value={maker}>
+                            {maker}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                        <ChevronDown className="h-4 w-4" />
+                      </div>
+                    </div>
+                    {selectedMaker && (
+                      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            Selected:
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {selectedMaker}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedMaker(null);
+                            setIsFilterDialogOpen(false);
+                          }}
+                          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg flex justify-end gap-3">
+                  <button
+                    onClick={() => setIsFilterDialogOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setIsFilterDialogOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-[#00bfa5] rounded-md hover:bg-[#00bfa5]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <TableHead>Status</TableHead>
-            <TableHead>Created At</TableHead>
+
+            <TableHead
+              className="cursor-pointer"
+              onClick={() => handleSort("created_at")}
+            >
+              <div className="flex items-center gap-1">
+                Created At
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      sortConfig?.key === "created_at" &&
+                      sortConfig.direction === "asc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                  >
+                    <ChevronUp
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "created_at" &&
+                        sortConfig.direction === "asc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                  <div
+                    className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      sortConfig?.key === "created_at" &&
+                      sortConfig.direction === "desc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                  >
+                    <ChevronDown
+                      className={`h-2.5 w-2.5 ${
+                        sortConfig?.key === "created_at" &&
+                        sortConfig.direction === "desc"
+                          ? "text-white stroke-[2.5]"
+                          : sortConfig?.direction === null
+                          ? "text-gray-400 group-hover:text-[#00bfa5]"
+                          : "text-gray-400 group-hover:text-[#00bfa5]/70"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TableHead>
+
             <TableHead>View</TableHead>
           </TableRow>
         </TableHeader>
@@ -435,7 +785,8 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
               </TableCell>
             </TableRow>
           ) : (
-            filteredRequests.map((request) => (
+            getPaginatedData().map((request) => (
+              // filteredRequests.map((request) => (
               <TableRow key={request.request_id}>
                 <TableCell>
                   <Checkbox
@@ -505,6 +856,71 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
           )}
         </TableBody>
       </Table>
+
+
+
+
+   {totalPages > 0 && (
+      <div className="border-t border-[#e3f2fd] bg-white py-3 px-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-[#1a237e] font-medium">
+              Rows per page:
+            </span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1); // Reset to first page when changing page size
+              }}
+              className="h-8 px-2 rounded-lg border border-[#e3f2fd] text-sm text-[#1a237e] focus:outline-none focus:border-[#00bfa5]"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    currentPage === page
+                      ? "bg-[#00bfa5] text-white"
+                      : "border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+)}
+
+
+
 
       {/* Bulk Actions */}
       {selectedRequests.length > 0 && (
@@ -606,16 +1022,18 @@ export default function RowRequestManager({ selectTable }: RowRequestManagerProp
       {/* Confirm Dialog - New Addition */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ isOpen: false, requestId: '', isBulk: false })}
+        onClose={() =>
+          setConfirmDialog({ isOpen: false, requestId: "", isBulk: false })
+        }
         onConfirm={() => {
           if (confirmDialog.isBulk) {
             handleBulkAcceptConfirm();
           } else {
             handleConfirmAccept(confirmDialog.requestId);
           }
-          setConfirmDialog({ isOpen: false, requestId: '', isBulk: false });
+          setConfirmDialog({ isOpen: false, requestId: "", isBulk: false });
         }}
-        title={`Confirm ${confirmDialog.isBulk ? 'Bulk ' : ''}Approval`}
+        title={`Confirm ${confirmDialog.isBulk ? "Bulk " : ""}Approval`}
         description={
           confirmDialog.isBulk
             ? `Are you sure you want to approve ${selectedRequests.length} selected requests?`

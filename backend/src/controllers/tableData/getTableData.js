@@ -113,9 +113,9 @@ exports.getTableData = async (req, res) => {
       return acc;
     }, {});
 
-    console.log(dataTypes);
+    // console.log(dataTypes);
     //  console.log(result.rows);
-     console.log("new next");
+    //  console.log("new next");
      
     return res.status(200).json({
       success: true,
