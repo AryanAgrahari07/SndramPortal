@@ -1,15 +1,16 @@
 const { client_update } = require('../../configuration/database/databaseUpdate.js');
 
 exports.reject = async (req, res) => {
-    const { row_id, comments } = req.body;
+    const { row_id, comments, request_id } = req.body;
     const checker = req.user.user_id;
 
-    console.log('Received row_id:', row_id, 'type:', typeof row_id);
-
-    if (!row_id) {
+    // console.log('Received row_id:', row_id, 'type:', typeof row_id);
+    // console.log('Received request_id:', request_id, 'type:', typeof request_id);
+    
+    if (!row_id || !request_id) {
         return res.status(400).json({
             success: false,
-            message: 'row_id is required.',
+            message: 'row_id and request_id are required.',
         });
     }
 
@@ -21,22 +22,23 @@ exports.reject = async (req, res) => {
             SELECT ct.table_name, ct.new_data, ct.request_id::text as request_id
             FROM app.change_tracker ct
             WHERE ct.row_id = $1
+            AND ct.request_id = $2
             AND ct.status = 'pending';
         `;
         // console.log('Select Query:', selectQuery);
         // console.log('Select Query Params:', [row_id]);
         
-        const selectResult = await client_update.query(selectQuery, [row_id]);
+        const selectResult = await client_update.query(selectQuery, [row_id, request_id]);
 
         if (selectResult.rowCount === 0) {
             throw new Error('No pending record found with the given row_id.');
         }
 
-        const { request_id } = selectResult.rows[0];
+        // const { request_id } = selectResult.rows[0];
 
-        if (!request_id) {
-            throw new Error('Invalid data in change_tracker: request_id is missing.');
-        }
+        // if (!request_id) {
+        //     throw new Error('Invalid data in change_tracker: request_id is missing.');
+        // }
 
         // Update change_tracker status
         const updateTrackerQuery = `
@@ -47,13 +49,15 @@ exports.reject = async (req, res) => {
                 updated_at = NOW(),
                 checker = $3
             WHERE row_id = $4
+            AND request_id = $5
+            AND status = 'pending'
             RETURNING *;
         `;
 
         // console.log('Update Tracker Query:', updateTrackerQuery);
         // console.log('Update Tracker Values:', ['rejected', comments || null, checker, row_id]);
 
-        const trackerValues = ['rejected', comments || null, checker, row_id];
+        const trackerValues = ['rejected', comments || null, checker, row_id , request_id];
         const trackerResult = await client_update.query(updateTrackerQuery, trackerValues);
 
         if (trackerResult.rowCount === 0) {

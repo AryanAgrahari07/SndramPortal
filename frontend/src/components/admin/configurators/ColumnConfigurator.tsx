@@ -256,16 +256,16 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
     <div className="space-y-6 p-6 bg-white">
       <div className="space-y-6">
         <Select value={selectedTable} onValueChange={setSelectedTable}>
-          <SelectTrigger className="text-lg font-medium text-gray-900 border-0 p-0 h-auto hover:no-underline focus:ring-0">
-            <SelectValue placeholder="Select Table" />
+        <SelectTrigger className="text-lg font-medium text-gray-900 border border-gray-200 rounded-md px-3 py-2 h-auto hover:border-[#1A237E] focus:ring-0 focus:border-[#1A237E] transition-colors outline-none">
+        <SelectValue placeholder="Select Table" />
           </SelectTrigger>
           <SelectContent
             side="bottom"
             align="start"
-            className="bg-white w-[400px] max-h-[300px] overflow-y-auto"
-          >
+            className="bg-white w-[400px] max-h-[300px] overflow-y-auto border border-gray-200 shadow-sm"
+            >
             {tables.map((table) => (
-              <SelectItem key={table} value={table}>
+              <SelectItem key={table} value={table} className="hover:bg-gray-50 cursor-pointer">
                 {table}
               </SelectItem>
             ))}

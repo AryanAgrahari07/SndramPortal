@@ -207,6 +207,9 @@ export const TableRequests = () => {
   const handleReject = async () => {
     if (!requestToReject || !rejectComment) return;
 
+    const request = requests.find(req => req.row_id === requestToReject);
+    if (!request) return;
+    
     try {
       const response = await fetch(`${API_URL}${ENDPOINTS.CHECKER.REJECT}`, {
         method: "POST", 
@@ -217,6 +220,7 @@ export const TableRequests = () => {
         },
         body: JSON.stringify({
           row_id: requestToReject,
+          request_id: request.request_id,
           comments: rejectComment,
         }),
       });
@@ -675,6 +679,7 @@ export const TableRequests = () => {
                 }
               }}
               disabled={!rejectComment}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
             >
               Reject
             </Button>

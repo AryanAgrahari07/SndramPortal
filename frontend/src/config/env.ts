@@ -1,7 +1,4 @@
-
-
-
 export const config = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
-  otpExpirySeconds: parseInt(import.meta.env.VITE_OTP_EXPIRY_SECONDS || '30', 10)
+  otpExpirySeconds: parseInt(import.meta.env.VITE_OTP_EXPIRY_SECONDS || '60', 10)
 }

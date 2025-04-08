@@ -160,11 +160,14 @@ export const History = () => {
   };
 
   const handleFilterChange = (status: FilterStatus) => {
+    setIsLoading(true); 
     setFilterStatus(status);
     setSearchText("");
     setSearchQuery("");
     setCustomDateRange({ from: "", to: "" });
     setCurrentPage(1); // Reset to the first page
+
+    setRequests([]);
     loadRequests();
   };
 

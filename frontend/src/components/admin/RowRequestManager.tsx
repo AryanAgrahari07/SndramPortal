@@ -1108,7 +1108,7 @@ export default function RowRequestManager({
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] p-0">
+        <DialogContent className="w-[400px] sm:max-w-[400px] p-0">
           <DialogHeader className="px-6 py-4 border-b">
             <DialogTitle className="text-xl font-semibold">
               {rejectingRequestId
