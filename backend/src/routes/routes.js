@@ -96,6 +96,11 @@ const {
 const { refreshToken } = require("../controllers/refreshToken/refreshToken.js");
 const { bulkUpdate } = require("../controllers/bulkupload/bulkupload.js");
 const validateBulkData  = require("../middleware/bulkdatavalidation.js");
+const { AdminHistory } = require("../controllers/adminHistory/AdminHistory.js");
+
+
+//admin history route
+router.get('/history',verifyToken,authorize("admin"),AdminHistory);
 
 // refreshing access and refresh token
 router.post("/refresh-token", refreshToken);

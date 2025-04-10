@@ -153,17 +153,17 @@ export default function RowRequestManager({
   // function to filter by date range
   const filterByDateRange = (requests: any[]) => {
     if (!dateRange) return requests;
-    
+
     return requests.filter((request) => {
       const requestDate = new Date(request.created_at);
 
-       // If only start date is selected
+      // If only start date is selected
       if (dateRange.start && !dateRange.end) {
         const startDate = new Date(dateRange.start);
         return requestDate >= startDate;
       }
 
-       // If only end date is selected
+      // If only end date is selected
       if (!dateRange.start && dateRange.end) {
         const endDate = new Date(dateRange.end);
         endDate.setHours(23, 59, 59, 999); // Include the entire end date
@@ -177,7 +177,7 @@ export default function RowRequestManager({
         endDate.setHours(23, 59, 59, 999); // Include the entire end date
         return requestDate >= startDate && requestDate <= endDate;
       }
-      
+
       return true;
     });
   };
@@ -218,7 +218,7 @@ export default function RowRequestManager({
     }
 
     // Apply date range filter
-      result = filterByDateRange(result);
+    result = filterByDateRange(result);
 
     // Apply sorting
     if (sortConfig) {
@@ -260,7 +260,6 @@ export default function RowRequestManager({
       setSelectedTable(selectTable);
     }
   }, [selectTable]);
-
 
   useEffect(() => {
     fetchRequests();
@@ -483,25 +482,22 @@ export default function RowRequestManager({
     }
   };
 
-   // Update filteredRequests to use the new function
-   const filteredRequests = getSortedAndFilteredRequests();
+  // Update filteredRequests to use the new function
+  const filteredRequests = getSortedAndFilteredRequests();
 
-   
-   useEffect(() => {
+  useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [selectedTable, selectedMaker, sortConfig]);
 
-  
-   const getPaginatedData = () => {
+  const getPaginatedData = () => {
     if (filteredRequests.length === 0) return [];
 
-     const startIndex = (currentPage - 1) * itemsPerPage;
-     const endIndex = startIndex + itemsPerPage;
-     return filteredRequests.slice(startIndex, endIndex);
-   };
- 
-   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
- 
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredRequests.slice(startIndex, endIndex);
+  };
+
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
 
   return (
     <div className="space-y-4">
@@ -800,127 +796,125 @@ export default function RowRequestManager({
                     />
                   </div>
                 </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsDateFilterDialogOpen(true);
-                    }}
-                    className={`ml-1 p-1 rounded transition-colors duration-200 ${
-                      dateRange
-                        ? "bg-[#00bfa5]/10 text-[#00bfa5] hover:bg-[#00bfa5]/20"
-                        : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    }`}
-                  >
-                    <Filter className="h-4 w-4" />
-                  </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDateFilterDialogOpen(true);
+                  }}
+                  className={`ml-1 p-1 rounded transition-colors duration-200 ${
+                    dateRange
+                      ? "bg-[#00bfa5]/10 text-[#00bfa5] hover:bg-[#00bfa5]/20"
+                      : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
               </div>
             </TableHead>
 
-
             <Dialog
-                open={isDateFilterDialogOpen}
-                onOpenChange={setIsDateFilterDialogOpen}
-              >
-                <DialogContent className="sm:max-w-[425px] p-0">
-                  <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                    <DialogTitle className="text-lg font-semibold text-gray-900">
-                      Filter by Date Range
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="p-6">
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label
-              htmlFor="start-date"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              open={isDateFilterDialogOpen}
+              onOpenChange={setIsDateFilterDialogOpen}
             >
-              Start Date
-            </label>
-            <input
-              type="date"
-              id="start-date"
-              value={dateRange?.start || ""}
-              onChange={(e) => {
-                setDateRange(prev => ({
-                  ...prev || { end: "" },
-                  start: e.target.value
-                }));
-              }}
-              className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="end-date"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              End Date
-            </label>
-            <input
-              type="date"
-              id="end-date"
-              value={dateRange?.end || ""}
-              onChange={(e) => {
-                setDateRange(prev => ({
-                  ...prev || { start: "" },
-                  end: e.target.value
-                }));
-              }}
-              className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
-            />
-          </div>
-        </div>
-        
-        {dateRange && (dateRange.start || dateRange.end) && (
-          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
-                Selected Range:
-              </span>
-              <span className="text-sm font-medium text-gray-900">
-                {dateRange.start && new Date(dateRange.start).toLocaleDateString()} - 
-                {dateRange.end && new Date(dateRange.end).toLocaleDateString()}
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                setDateRange(null);
-                setIsDateFilterDialogOpen(false);
-              }}
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-4 w-4" />
-              Clear
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+              <DialogContent className="sm:max-w-[425px] p-0">
+                <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                  <DialogTitle className="text-lg font-semibold text-gray-900">
+                    Filter by Date Range
+                  </DialogTitle>
+                </DialogHeader>
 
-    <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg flex justify-end gap-3">
-      <button
-        onClick={() => setIsDateFilterDialogOpen(false)}
-        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={() => setIsDateFilterDialogOpen(false)}
-        className="px-4 py-2 text-sm font-medium text-white bg-[#00bfa5] rounded-md hover:bg-[#00bfa5]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
-      >
-        Apply
-      </button>
-    </div>
-  </DialogContent>
-</Dialog>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label
+                          htmlFor="start-date"
+                          className="block text-sm font-medium text-gray-700 mb-2"
+                        >
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          id="start-date"
+                          value={dateRange?.start || ""}
+                          onChange={(e) => {
+                            setDateRange((prev) => ({
+                              ...(prev || { end: "" }),
+                              start: e.target.value,
+                            }));
+                          }}
+                          className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="end-date"
+                          className="block text-sm font-medium text-gray-700 mb-2"
+                        >
+                          End Date
+                        </label>
+                        <input
+                          type="date"
+                          id="end-date"
+                          value={dateRange?.end || ""}
+                          onChange={(e) => {
+                            setDateRange((prev) => ({
+                              ...(prev || { start: "" }),
+                              end: e.target.value,
+                            }));
+                          }}
+                          className="w-full appearance-none bg-white px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-[#00bfa5] transition-colors duration-200"
+                        />
+                      </div>
+                    </div>
 
+                    {dateRange && (dateRange.start || dateRange.end) && (
+                      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">
+                            Selected Range:
+                          </span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {dateRange.start &&
+                              new Date(
+                                dateRange.start
+                              ).toLocaleDateString()}{" "}
+                            -
+                            {dateRange.end &&
+                              new Date(dateRange.end).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setDateRange(null);
+                            setIsDateFilterDialogOpen(false);
+                          }}
+                          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-4 w-4" />
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-
-
-
-
+                <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg flex justify-end gap-3">
+                  <button
+                    onClick={() => setIsDateFilterDialogOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setIsDateFilterDialogOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-[#00bfa5] rounded-md hover:bg-[#00bfa5]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00bfa5]"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             <TableHead>View</TableHead>
           </TableRow>
@@ -1011,66 +1005,68 @@ export default function RowRequestManager({
         </TableBody>
       </Table>
 
-
-   {totalPages > 0 && (
-      <div className="border-t border-[#e3f2fd] bg-white py-3 px-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-[#1a237e] font-medium">
-              Rows per page:
-            </span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1); // Reset to first page when changing page size
-              }}
-              className="h-8 px-2 rounded-lg border border-[#e3f2fd] text-sm text-[#1a237e] focus:outline-none focus:border-[#00bfa5]"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    currentPage === page
-                      ? "bg-[#00bfa5] text-white"
-                      : "border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+      {totalPages > 0 && (
+        <div className="border-t border-[#e3f2fd] bg-white py-3 px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-[#1a237e] font-medium">
+                Rows per page:
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1); // Reset to first page when changing page size
+                }}
+                className="h-8 px-2 rounded-lg border border-[#e3f2fd] text-sm text-[#1a237e] focus:outline-none focus:border-[#00bfa5]"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </div>
-            
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded-md text-sm ${
+                        currentPage === page
+                          ? "bg-[#00bfa5] text-white"
+                          : "border border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-)}
-
+      )}
 
       {/* Bulk Actions */}
       {selectedRequests.length > 0 && (

@@ -4,11 +4,12 @@ import { UserManagement, RowRequestManager } from "@/components/admin";
 
 import Configuration from "@/components/admin/Configuration";
 import { useSearchParams } from "react-router-dom";
+import { AdminHistory } from "@/components/admin/AdminHistory";
 
 const AdminPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<
-    "rowRequests" | "configuration" | "userManagement"
+    "rowRequests" | "configuration" | "userManagement" | "adminHistory"
   >("rowRequests");
   // const firstName = localStorage.getItem("firstName") || "Admin";
 
@@ -63,6 +64,16 @@ const AdminPage: React.FC = () => {
             >
               User Management
             </button>
+            <button
+              onClick={() => setActiveTab("adminHistory")}
+              className={`py-2 px-1 inline-flex items-center border-b-2 ${
+                activeTab === "adminHistory"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+               History
+            </button>
           </nav>
         </div>
 
@@ -71,6 +82,7 @@ const AdminPage: React.FC = () => {
           {activeTab === "rowRequests" && <RowRequestManager selectTable = {selectTable} />}
           {activeTab === "configuration" && <Configuration />}
           {activeTab === "userManagement" && <UserManagement />}
+          {activeTab === "adminHistory" && <AdminHistory />}
         </div>
       </div>
     </Layout>
