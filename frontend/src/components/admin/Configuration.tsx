@@ -3,8 +3,9 @@ import ColumnConfigurator from "./configurators/ColumnConfigurator";
 import DropdownManager from "./configurators/DropdownManager";
 import GroupConfiguration from "./configurators/GroupConfiguration";
 import TableConfigurator from "./configurators/TableConfigurator";
+import ColumnRenamer from "./configurators/ColumnRenamer";
 
-type TabType = "column" | "dropdown" | "group" | "table";
+type TabType = "column" | "dropdown" | "group" | "table" | "rename";
 
 const Configuration = () => {
   const [activeTab, setActiveTab] = useState<TabType>("column");
@@ -19,6 +20,8 @@ const Configuration = () => {
         return <GroupConfiguration />;
       case "table":
         return <TableConfigurator />;
+      case "rename":
+        return <ColumnRenamer />;
       default:
         return null;
     }
@@ -66,6 +69,17 @@ const Configuration = () => {
           }`}
         >
           Table Configuration
+        </button>
+
+        <button
+           onClick={() => setActiveTab("rename")}
+           className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+             activeTab === "rename"
+               ? "bg-[#0F172A] text-white"
+               : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+           }`}
+        >
+          Rename Columns
         </button>
       </div>
 

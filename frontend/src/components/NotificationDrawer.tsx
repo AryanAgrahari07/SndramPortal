@@ -22,6 +22,11 @@ interface NotificationDrawerProps {
   role: "maker" | "checker" | "admin";
 }
 
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
+}
+
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   isOpen,
   onClose,
@@ -40,6 +45,9 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const userRole = role;
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
+  const [isLoadingColumns, setIsLoadingColumns] = useState(false);
+
 
   const handleClose = async () => {
     if (userRole === "admin") {
@@ -97,6 +105,50 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
       setIsLoading(false);
     }
   };
+
+
+  const fetchRenamed = async (tableName: string) => {
+    try {
+      setIsLoadingColumns(true);
+      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch renamed table data');
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setRenamedColumns(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching renamed columns:', error);
+    } finally {
+      setIsLoadingColumns(false);
+    }
+  };
+
+  const getDisplayName = (columnName: string) => {
+    if (isLoadingColumns) {
+      return "Loading...";
+    }
+    
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    const mapping = renamedColumns.find(m => m.original_column_name === columnName);
+    return mapping?.renamed_column_name || columnName;
+  };
+
 
   const handleNotificationClick = (notification: Notification) => {
     if (userRole === "checker") {
@@ -233,7 +285,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             <h4 className="text-xs font-medium text-gray-500 mb-2">Row Data</h4>
             {Object.entries(newData).map(([key, value]) => (
               <div key={key} className="mb-2">
-                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-xs text-gray-600 block">{getDisplayName(key)}:</span>
                 <span className="text-sm text-gray-900">
                   {value === null || value === undefined ? "-" : String(value)}
                 </span>
@@ -277,7 +329,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             </h4>
             {changedFields.map((key) => (
               <div key={key} className="mb-2">
-                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-xs text-gray-600 block">{getDisplayName(key)}:</span>
                 <span className="text-sm text-gray-900">
                   {oldData[key] === null || oldData[key] === undefined
                     ? "-"
@@ -292,7 +344,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
             </h4>
             {changedFields.map((key) => (
               <div key={key} className="mb-2">
-                <span className="text-xs text-gray-600 block">{key}:</span>
+                <span className="text-xs text-gray-600 block">{getDisplayName(key)}:</span>
                 <span className="text-sm text-gray-900">
                   {newData[key] === null || newData[key] === undefined
                     ? "-"
@@ -306,7 +358,23 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     );
   };
 
-  const toggleChanges = (notificationId: string) => {
+
+  useEffect(() => {
+    if (notifications[0]?.table_name) {
+      fetchRenamed(notifications[0].table_name);
+    } else {
+      setRenamedColumns([]);
+    }
+  }, [notifications]); 
+
+  const toggleChanges = async (notificationId: string) => {
+
+    const notification = notifications.find(n => n.request_id === notificationId);
+    if (notification) {
+      // Fetch renamed columns for this notification's table
+      await fetchRenamed(notification.table_name);
+    }
+
     setExpandedNotifications((prev) => ({
       ...prev,
       [notificationId]: !prev[notificationId],

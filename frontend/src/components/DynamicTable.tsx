@@ -97,6 +97,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   const {
     data: processedData,
     columns,
+    renamedColumns,
     dataTypes,
     isLoading: isDataLoading,
     error: dataError,
@@ -115,6 +116,15 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
   };
+
+  
+
+  const getDisplayName = (columnName: string) => {
+    if (!renamedColumns) return columnName;
+    const mapping = renamedColumns.find(m => m.originalName === columnName);
+    return mapping?.displayName || columnName;
+  };
+
 
   // search button handler
   const handleSearchClick = () => {
@@ -713,7 +723,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
                         className="flex items-center gap-2 cursor-pointer group whitespace-nowrap"
                         onClick={() => handleSort(column)}
                       >
-                        {column}
+                        {getDisplayName(column)}
 
                         <div
                           className={` flex flex-col gap-0 ml-1.5 
@@ -989,6 +999,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         onClose={handleDrawerClose}
         row={selectedRow}
         columns={columns}
+        renamedColumns={renamedColumns}
         onSave={handleRowSave}
         mode={isAddMode ? "add" : "edit"}
         isColumnEditable={isColumnEditable}

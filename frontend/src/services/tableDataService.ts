@@ -31,6 +31,8 @@ export interface TableDataResponse {
   success: boolean;
   data: Record<string, unknown>[];
   columns: string[];
+  originalColumns: string[];
+  renamedColumns: { originalName: string; displayName: string }[];  // Add this
   dataTypes: Record<string, string>;
   message?: string;
   pagination: PaginationData;
@@ -105,6 +107,8 @@ export const fetchTableData = async (
       success: false,
       data: [],
       columns: [],
+      originalColumns: [],
+      renamedColumns: [],
       dataTypes: {},
       message: "No authentication token found",
       pagination: DEFAULT_PAGINATION,
@@ -154,6 +158,8 @@ export const fetchTableData = async (
         success: true,
         data: data.data,
         columns: data.columns,
+        originalColumns: data.originalColumns,
+        renamedColumns: data.renamedColumns,
         dataTypes: data.dataTypes,
         pagination: data.pagination,
       },
@@ -165,6 +171,8 @@ export const fetchTableData = async (
         success: false,
         data: [],
         columns: [],
+        originalColumns: [],
+        renamedColumns: [],
         dataTypes: {},
         message: data.message || `Failed to fetch data for table ${tableName}`,
         pagination: DEFAULT_PAGINATION,
@@ -176,6 +184,8 @@ export const fetchTableData = async (
       success: true,
       data: Array.isArray(data.data) ? data.data : [],
       dataTypes: data.dataTypes,
+      originalColumns: data.originalColumns,
+      renamedColumns: data.renamedColumns,
       columns: Array.isArray(data.columns)
         ? data.columns
         : Array.isArray(data.data) && data.data.length > 0
@@ -197,6 +207,8 @@ export const fetchTableData = async (
       success: false,
       data: [],
       columns: [],
+      originalColumns: [],
+      renamedColumns: [],
       dataTypes: {},
       message:
         error instanceof Error ? error.message : "Failed to fetch table data",

@@ -17,9 +17,16 @@ interface UseTableDataProps {
   };
 }
 
+interface renamedColumns {
+  originalName: string;
+  displayName: string;
+}
+
 export interface UseTableDataReturn {
   data: Record<string, unknown>[];
   columns: string[];
+  originalColumns: string[];
+  renamedColumns: renamedColumns[];
   dataTypes: Record<string, string>;
   isLoading: boolean;
   error: string | null;
@@ -35,6 +42,8 @@ export const useTableData = ({
 }: UseTableDataProps): UseTableDataReturn => {
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
+  const [originalColumns, setOriginalColumns] = useState<string[]>([]);
+  const [renamedColumns, setRenamedColumns] = useState<renamedColumns[]>([]);
   const [dataTypes, setDataTypes] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +75,8 @@ export const useTableData = ({
       if (response.success) {
         setData(response.data);
         setColumns(response.columns);
+        setOriginalColumns(response.originalColumns);
+        setRenamedColumns(response.renamedColumns);
         setDataTypes(response.dataTypes);
         setPagination(response.pagination);
       } else {
@@ -73,6 +84,8 @@ export const useTableData = ({
         // Reset data but keep current pagination settings
         setData([]);
         setColumns([]);
+        setOriginalColumns([]);
+        setRenamedColumns([]);
       }
     } catch (err) {
       const errorMessage =
@@ -81,6 +94,8 @@ export const useTableData = ({
       // Reset data but keep current pagination settings
       setData([]);
       setColumns([]);
+      setOriginalColumns([]);
+      setRenamedColumns([]);
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +126,8 @@ export const useTableData = ({
   return {
     data,
     columns,
+    originalColumns,
+    renamedColumns,
     dataTypes,
     isLoading,
     error,

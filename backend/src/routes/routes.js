@@ -37,6 +37,7 @@ const {
 const { addGroup } = require("../controllers/tablesGroup/tableGroup.js");
 const { addTable } = require("../controllers/tablesGroup/tableGroup.js");
 const { getGroupList } = require("../controllers/getGroupList/getGroupList.js");
+const { getGroupListMaker } = require("../controllers/getGroupList/getGroupListMaker.js");
 const { removeGroup } = require("../controllers/removeGroup/removeGroup.js");
 const { removeTable } = require("../controllers/removeTable/removeTable.js");
 const {
@@ -97,7 +98,19 @@ const { refreshToken } = require("../controllers/refreshToken/refreshToken.js");
 const { bulkUpdate } = require("../controllers/bulkupload/bulkupload.js");
 const validateBulkData  = require("../middleware/bulkdatavalidation.js");
 const { AdminHistory } = require("../controllers/adminHistory/AdminHistory.js");
+const { toggleGroup } = require("../controllers/toggleGroup/toggleGroup.js");
+const { updateColumnRename, getColumnRenames, deleteColumnRename } = require("../controllers/columnRename/columnRename.js");
+const { getRenamed } = require("../controllers/fetchrenamed/fetchrenamed.js");
 
+
+router.post("/column-rename", verifyToken, authorize("admin"), updateColumnRename);
+router.get("/columns/:table_name", verifyToken, authorize("admin"), getColumnRenames);
+router.delete("/column-rename/:table_name/:column_name", verifyToken, authorize("admin"), deleteColumnRename)
+
+router.get("/renamed/:table_name", verifyToken, getRenamed);
+
+//toggle group route
+router.post('/toggle', verifyToken,authorize("admin"), toggleGroup);
 
 //admin history route
 router.get('/history',verifyToken,authorize("admin"),AdminHistory);
@@ -154,6 +167,7 @@ router.post("/fetchDropdownOptions", verifyToken, fetchDropdownOptions);
 router.post("/addgroup", verifyToken, authorize("admin"), addGroup); //create group
 router.post("/addtable", verifyToken, authorize("admin"), addTable); // add table inside of a group
 router.get("/getgrouplist", verifyToken, getGroupList); //show all group and table list respectively
+router.get("/getgrouplistmaker", verifyToken, getGroupListMaker); //show all group and table list respectively
 router.post("/removegroup", verifyToken, authorize("admin"), removeGroup);
 router.post("/removetable", verifyToken, authorize("admin"), removeTable);
 

@@ -16,11 +16,14 @@ import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Switch } from "@/components/ui/Switch";
+import axios from "axios";
 
 interface TableGroup {
   group_id: string;
   group_name: string;
   tables: string[];
+  is_enabled: boolean;
 }
 
 interface ApiGroupResponse {
@@ -29,6 +32,7 @@ interface ApiGroupResponse {
     group_name: string;
     table_list: string[];
     row_id: string | null;
+    is_enabled: boolean;
   }[];
 }
 
@@ -98,6 +102,7 @@ const GroupConfiguration: React.FC = () => {
           group_id: group.row_id || group.group_name,
           group_name: group.group_name,
           tables: group.table_list,
+          is_enabled: group.is_enabled,
         }));
         setGroups(formattedGroups);
       } else {
@@ -146,6 +151,48 @@ const GroupConfiguration: React.FC = () => {
       });
     }
   };
+
+  const handleToggleGroup = async (groupId: string, isEnabled: boolean) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+      "http://localhost:8080/toggle",
+      {
+        group_name: groupId, // Using group_name since that's what your schema uses
+        is_enabled: isEnabled
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true
+      }
+    );
+
+    if (response.data.success) {
+      setGroups(groups.map(group => 
+        group.group_name === groupId 
+          ? { ...group, is_enabled: isEnabled }
+          : group
+      ));
+      
+      toast({
+        title: "Success",
+        description: `Group ${isEnabled ? 'enabled' : 'disabled'} successfully`,
+      });
+    } else {
+      throw new Error(response.data.message || "Failed to update group status");
+    }
+  } catch (error) {
+    console.error("Failed to update group status:", error);
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to update group status",
+      variant: "destructive",
+    });
+  }
+  };
+
 
   const handleCreateGroup = async () => {
     const validation = validateGroupName(newGroupName);
@@ -403,6 +450,16 @@ const GroupConfiguration: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
+              <Switch
+                checked={group.is_enabled}
+                onCheckedChange={(checked) => handleToggleGroup(group.group_name, checked)}
+                aria-label={`Toggle ${group.group_name} group`}
+              />
+              <span className="text-sm text-gray-500">
+                {group.is_enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
                     <Button
                       onClick={() => handleOpenAddTablesDialog(group)}
                       className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"

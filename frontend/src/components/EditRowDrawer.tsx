@@ -16,6 +16,7 @@ interface EditRowDrawerProps {
   onClose: () => void;
   row: Record<string, unknown> | null;
   columns: string[];
+  renamedColumns: { originalName: string; displayName: string }[];
   onSave: (updatedRow: Record<string, unknown>) => void;
   mode: "edit" | "add";
   isColumnEditable: (column: string) => boolean;
@@ -44,6 +45,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   onClose,
   row,
   columns,
+  renamedColumns,
   onSave,
   mode,
   isColumnEditable,
@@ -59,6 +61,13 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   const isPrimaryKey = (column: string): boolean => {
     const expectedPkName = `${tableName}_sk`.toLowerCase();
     return column.toLowerCase() === expectedPkName;
+  };
+
+  const getDisplayName = (columnName: string) => {
+    if (!renamedColumns) return columnName;
+    const mapping = renamedColumns.find(m => m.originalName === columnName);
+    // Only return display name if it's different from original name
+    return mapping?.displayName !== mapping?.originalName ? mapping?.displayName : columnName;
   };
 
   useEffect(() => {
@@ -447,7 +456,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                           htmlFor={column}
                           className="block text-sm font-medium text-gray-700 capitalize"
                         >
-                          {column.split("_").join(" ")}
+                         {getDisplayName(column)}
                         </label>
                         {dropdownConfig && isEditable ? (
                           <DynamicDropdown

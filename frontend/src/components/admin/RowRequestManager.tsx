@@ -42,11 +42,17 @@ interface RowRequest {
   maker_email: string;
 }
 
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
+}
+
 interface RowDataDialogProps {
   isOpen: boolean;
   onClose: () => void;
   data: RowData;
   title?: string;
+  tableName: string;
 }
 
 const RowDataDialog: React.FC<RowDataDialogProps> = ({
@@ -54,6 +60,7 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
   onClose,
   data,
   title = "Row Data",
+  tableName,
 }) => {
   // Filter out empty strings and null/undefined values
   const filteredData = Object.entries(data || {}).reduce(
@@ -65,6 +72,60 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
     },
     {} as RowData
   );
+
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
+  const [isLoadingColumns, setIsLoadingColumns] = useState(false);
+
+  const fetchRenamed = async (tableName: string) => {
+    try {
+      setIsLoadingColumns(true);
+      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch renamed table data');
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setRenamedColumns(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching renamed columns:', error);
+    } finally {
+      setIsLoadingColumns(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && tableName) {
+      fetchRenamed(tableName);
+    }
+  }, [isOpen, tableName]);
+
+  // Add this function to get display name
+  const getDisplayName = (columnName: string) => {
+    if (isLoadingColumns) {
+      return "Loading...";
+    }
+
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    const mapping = renamedColumns.find(m => m.original_column_name === columnName);
+    return mapping?.renamed_column_name || columnName;
+  };
+
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -89,7 +150,7 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
                 {Object.entries(filteredData).map(([key, value]) => (
                   <tr key={key}>
                     <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                      {key}
+                      {getDisplayName(key)}
                     </td>
                     <td className="px-6 py-3 text-sm text-gray-500">
                       {String(value)}
@@ -136,7 +197,6 @@ export default function RowRequestManager({
     isBulk: false,
   });
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
-
   const [sortConfig, setSortConfig] = useState<{
     key: "maker_email" | "table_name" | "created_at";
     direction: "asc" | "desc";
@@ -1099,6 +1159,7 @@ export default function RowRequestManager({
           onClose={() => setViewingData(null)}
           data={viewingData}
           title="Row Data Details"
+          tableName={selectedTable|| ""}
         />
       )}
 

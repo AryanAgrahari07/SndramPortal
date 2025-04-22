@@ -14,6 +14,20 @@ exports.getTableData = async (req, res) => {
       pageSize = 10,
     } = req.query;
 
+        // First get any column renames for this table
+        const renameQuery = `
+        SELECT original_column_name, renamed_column_name
+        FROM app.column_renames
+        WHERE table_name = $1
+      `;
+      const renameResult = await client_update.query(renameQuery, [tableName]);
+      
+      // Create a map of original to renamed columns
+      const columnRenames = {};
+      renameResult.rows.forEach(row => {
+        columnRenames[row.original_column_name] = row.renamed_column_name;
+      });
+
     // base query
     let query = `SELECT * FROM app.${tableName}`;
     const values = [];
@@ -113,14 +127,17 @@ exports.getTableData = async (req, res) => {
       return acc;
     }, {});
 
-    // console.log(dataTypes);
-    //  console.log(result.rows);
-    //  console.log("new next");
-     
+     // Create column mapping with both original and renamed names
+     const columnMapping = result.fields.map(field => ({
+      originalName: field.name,
+      displayName: columnRenames[field.name] || field.name
+    }));
+
     return res.status(200).json({
       success: true,
       data: result.rows,
       columns: result.fields.map((field) => field.name), // Add columns
+      renamedColumns: columnMapping, 
       dataTypes: dataTypes,
       pagination: {
         total: parseInt(countResult.rows[0].count),

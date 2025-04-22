@@ -13,6 +13,7 @@ const fetchCheckerGroupRequest = async (req, res) => {
     const groupQuery = `
       SELECT group_name, table_list::json as table_list
       FROM app.group_table
+      where is_enabled = true
       ORDER BY group_name ASC;
     `;
     const groupResult = await client_update.query(groupQuery);

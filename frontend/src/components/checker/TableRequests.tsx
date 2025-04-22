@@ -53,6 +53,11 @@ interface ApiResponse {
   data: ChangeRequest[];
 }
 
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
+}
+
 export const TableRequests = () => {
   const { tableName } = useParams();
   const navigate = useNavigate();
@@ -70,7 +75,7 @@ export const TableRequests = () => {
   const [selectedChange, setSelectedChange] = useState<ChangeRequest | null>(
     null
   );
-
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     requestId: '',
@@ -104,6 +109,43 @@ export const TableRequests = () => {
         return {};
     }
 };
+
+  const fetchRenamed = async () => {
+    const response = await fetch(`http://localhost:8080/renamed/${tableName}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to fetch renamed table data');
+    }
+    
+    const data = await response.json();
+    if (data.success) {
+      // Set the renamed columns data
+      setRenamedColumns(data.data);
+    }
+  };
+
+  useEffect(() => {
+    fetchRenamed();
+  }, []); 
+
+  const getDisplayName = (columnName: string) => {
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    const mapping = renamedColumns.find(m => m.original_column_name === columnName);
+    return mapping?.renamed_column_name || columnName;
+  };
 
   // Fetch requests
   const fetchRequests = useCallback(async () => {
@@ -487,7 +529,7 @@ export const TableRequests = () => {
               <TableHead className="font-medium">Date & Time</TableHead>
               {getRelevantColumns(requests).map((column) => (
                 <TableHead key={column} className="font-medium capitalize">
-                  {column.replace(/_/g, " ")}
+                  {getDisplayName(column)}
                 </TableHead>
               ))}
             </TableRow>

@@ -28,5 +28,6 @@ export const ENDPOINTS = {
     REJECT: "/reject",
     APPROVE_ALL: "/approveall",
     REJECT_ALL: "/rejectall",
+    GET_RENAMED: "/renamed",
   },
 };

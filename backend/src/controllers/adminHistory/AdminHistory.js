@@ -9,6 +9,9 @@ exports.AdminHistory = async (req, res) => {
       search,
       from,
       to,
+      sortBy,
+      sortOrder = 'desc',
+      type
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -74,6 +77,13 @@ exports.AdminHistory = async (req, res) => {
     let paramCount = 1;
     let whereClauses = [];
 
+    // Add type filter
+    if (type && type !== 'all') {
+      whereClauses.push(`type = $${paramCount}`);
+      params.push(type);
+      paramCount++;
+    }
+    
     if (status && status !== 'all') {
       whereClauses.push(`status = $${paramCount}`);
       params.push(status);
@@ -108,6 +118,26 @@ exports.AdminHistory = async (req, res) => {
       ? ' AND ' + whereClauses.join(' AND ')
       : '';
 
+    // Add sorting
+    let orderByClause = 'ORDER BY created_at DESC';
+    if (sortBy) {
+      const validSortColumns = [
+        'table_name',
+        'maker_email',
+        'checker_email',
+        'status',
+        'created_at',
+        'updated_at',
+        'type'
+      ];
+      
+      if (validSortColumns.includes(sortBy)) {
+        orderByClause = `ORDER BY ${sortBy} ${sortOrder === 'desc' ? 'DESC' : 'ASC'}`;
+      }
+    } else {
+      orderByClause = 'ORDER BY created_at DESC';
+    }
+
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
@@ -120,7 +150,7 @@ exports.AdminHistory = async (req, res) => {
     // Get paginated results
     const finalQuery = `
       ${baseQuery}${whereClause}
-      ORDER BY created_at DESC
+      ${orderByClause}
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
     `;
 

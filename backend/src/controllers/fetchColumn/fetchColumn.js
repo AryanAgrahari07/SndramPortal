@@ -12,17 +12,17 @@ exports.fetchColumn = async (req, res) => {
     }
 
     try {
-        // Query to get all column names for the given table in the app schema
+    // Query to get all column names for the given table in the app schema
         const query = `
             SELECT column_name
             FROM information_schema.columns
             WHERE table_schema = 'app' AND table_name = $1;
         `;
         
-        // Execute the query
+    // Execute the query
         const result = await client_update.query(query, [table_name]);
 
-        // If no columns found
+    // If no columns found
         if (result.rowCount === 0) {
             return res.status(404).json({
                 success: false,
@@ -30,7 +30,7 @@ exports.fetchColumn = async (req, res) => {
             });
         }
 
-        // Return column names
+    // Return column names
         const columnNames = result.rows.map(row => row.column_name);
         return res.status(200).json({
             success: true,

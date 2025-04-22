@@ -56,7 +56,7 @@ export const TablesPage: React.FC = () => {
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch(`${API_URL}/getgrouplist`, {
+      const response = await fetch(`${API_URL}/getgrouplistmaker`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

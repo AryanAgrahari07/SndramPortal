@@ -4,10 +4,12 @@ import {
   CheckCircle,
   XCircle,
   FileWarning,
-  
   Eye,
   X,
   Search,
+  ChevronDown,
+  ChevronUp,
+  Filter,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -32,7 +34,7 @@ interface HistoryRecord {
   status: string;
   created_at: string;
   comments?: string;
-  type: 'change' | 'add';
+  type: "change" | "add";
   old_data?: Record<string, unknown>;
   new_data?: Record<string, unknown>;
   row_data?: Record<string, unknown>;
@@ -40,13 +42,33 @@ interface HistoryRecord {
   checker_email: string;
 }
 
+interface FilterParams {
+  sortColumn: string | null;
+  sortDirection: "asc" | "desc" | null;
+  currentPage: number;
+  typeFilter: "all" | "change" | "add";
+}
+
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
+}
+
 type FilterStatus = "all" | "approved" | "rejected";
-type DateFilter = "all" | "today" | "last7days" | "last30days" | "last90days" | "custom";
+type DateFilter =
+  | "all"
+  | "today"
+  | "last7days"
+  | "last30days"
+  | "last90days"
+  | "custom";
 
 export const AdminHistory = () => {
   const [requests, setRequests] = useState<HistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<HistoryRecord | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<HistoryRecord | null>(
+    null
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -60,19 +82,33 @@ export const AdminHistory = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [searchText, setSearchText] = useState("");
+  const [filterParams, setFilterParams] = useState<FilterParams>({
+    sortColumn: null,
+    sortDirection: null,
+    currentPage: 1,
+    typeFilter: "all",
+  });
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
+    null
+  );
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
+  const [isLoadingColumns, setIsLoadingColumns] = useState(false);
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response =  await fetch(`http://localhost:8080/history?page=${currentPage}&limit=${itemsPerPage}&status=${filterStatus}&search=${searchQuery}&from=${customDateRange.from}&to=${customDateRange.to}`, {
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `http://localhost:8080/history?page=${filterParams.currentPage}&limit=${itemsPerPage}&status=${filterStatus}&search=${searchQuery}&from=${customDateRange.from}&to=${customDateRange.to}&sortBy=${filterParams.sortColumn}&sortOrder=${filterParams.sortDirection}&type=${filterParams.typeFilter}`,
+        {
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await response.json();
-      
+
       if (data.success) {
         setRequests(data.data);
         setTotal(data.total);
@@ -92,7 +128,111 @@ export const AdminHistory = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, filterStatus, searchQuery, dateFilter, customDateRange,itemsPerPage, toast]);
+  }, [
+    filterParams,
+    itemsPerPage,
+    filterStatus,
+    searchQuery,
+    customDateRange,
+    toast,
+    dateFilter,
+  ]);
+
+  const fetchRenamed = async (tableName: string) => {
+    try {
+      setIsLoadingColumns(true);
+      const response = await fetch(
+        `http://localhost:8080/renamed/${tableName}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch renamed table data");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setRenamedColumns(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching renamed columns:", error);
+    } finally {
+      setIsLoadingColumns(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRequest?.table_name) {
+      // loadColumnConfig();
+      fetchRenamed(selectedRequest.table_name); // Add this line
+      setCurrentPage(1);
+    } else {
+      setRenamedColumns([]);
+    }
+  }, [selectedRequest]);
+
+  const getDisplayName = (columnName: string) => {
+    if (isLoadingColumns) {
+      return "Loading...";
+    }
+
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split("_")
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(" ");
+    }
+
+    const mapping = renamedColumns.find(
+      (m) => m.original_column_name === columnName
+    );
+    return mapping?.renamed_column_name || columnName;
+  };
+
+  const handleSort = useCallback((column: string) => {
+    setFilterParams((prev) => {
+      if (prev.sortColumn !== column) {
+        return {
+          ...prev,
+          sortColumn: column,
+          sortDirection: "asc",
+          currentPage: 1,
+        };
+      }
+
+      if (prev.sortDirection === "asc") {
+        return {
+          ...prev,
+          sortDirection: "desc",
+          currentPage: 1,
+        };
+      } else {
+        return {
+          ...prev,
+          sortColumn: null,
+          sortDirection: null,
+          currentPage: 1,
+        };
+      }
+    });
+  }, []);
+
+  // Add type filter handler
+  const handleTypeFilter = (type: "all" | "change" | "add") => {
+    setFilterParams((prev) => ({
+      ...prev,
+      typeFilter: type,
+      currentPage: 1,
+    }));
+  };
 
   useEffect(() => {
     loadRequests();
@@ -113,22 +253,35 @@ export const AdminHistory = () => {
   };
 
   const renderChanges = (request: HistoryRecord) => {
-    if (request.type === 'change' && request.old_data && request.new_data) {
+    if (request.type === "change" && request.old_data && request.new_data) {
       const changes: string[] = [];
       Object.keys(request.new_data || {}).forEach((key) => {
         if (request.old_data?.[key] !== request.new_data?.[key]) {
           changes.push(
-            `${key}: ${request.old_data?.[key] || "null"} → ${request.new_data?.[key] || "null"}`
+            `${getDisplayName(key)}: ${request.old_data?.[key] || "null"} → ${
+              request.new_data?.[key] || "null"
+            }`
           );
         }
       });
       return changes;
-    } else if (request.type === 'add' && request.row_data) {
-      return Object.entries(request.row_data).map(([key, value]) => 
-        `${key}: ${value || "null"}`
+    } else if (request.type === "add" && request.row_data) {
+      return Object.entries(request.row_data).map(
+        ([key, value]) => `${key}: ${value || "null"}`
       );
     }
     return [];
+  };
+
+  // Helper function to render new row data
+  const renderNewRow = (rowData: Record<string, unknown> | undefined) => {
+    if (!rowData) return null;
+    return Object.entries(rowData).map(([key, value], i) => (
+      <div key={i} className="text-gray-700">
+        <span className="text-gray-600">{getDisplayName(key)}:</span>{" "}
+        <span className="text-[#1A237E] font-medium">{String(value)}</span>
+      </div>
+    ));
   };
 
   const clearFilters = () => {
@@ -262,13 +415,154 @@ export const AdminHistory = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Table Name</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    Table Name
+                    <div className="flex flex-col gap-0 ml-1.5">
+                      <div
+                        className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      filterParams.sortColumn === "table_name" &&
+                      filterParams.sortDirection === "asc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                        onClick={() => handleSort("table_name")}
+                      >
+                        <ChevronUp
+                          className={`h-2.5 w-2.5 ${
+                            filterParams.sortColumn === "table_name" &&
+                            filterParams.sortDirection === "asc"
+                              ? "text-white stroke-[2.5]"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      </div>
+                      <div
+                        className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      filterParams.sortColumn === "table_name" &&
+                      filterParams.sortDirection === "desc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                        onClick={() => handleSort("table_name")}
+                      >
+                        <ChevronDown
+                          className={`h-2.5 w-2.5 ${
+                            filterParams.sortColumn === "table_name" &&
+                            filterParams.sortDirection === "desc"
+                              ? "text-white stroke-[2.5]"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TableHead>
+
+                <TableHead>
+                  <div className="flex items-center gap-2 relative">
+                    Type
+                    <button
+                      className="p-1.5 rounded transition-colors text-gray-400 hover:bg-[#e3f2fd] hover:text-[#00bfa5]"
+                      onClick={() =>
+                        setActiveFilterColumn(
+                          activeFilterColumn === "type" ? null : "type"
+                        )
+                      }
+                    >
+                      <Filter className="w-4 h-4" />
+                    </button>
+                    {activeFilterColumn === "type" && (
+                      <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-[#e3f2fd] z-[9999]">
+                        <div className="p-4">
+                          <div className="space-y-2">
+                            <button
+                              className={`w-full text-left px-3 py-2 rounded-md ${
+                                filterParams.typeFilter === "all"
+                                  ? "bg-[#e3f2fd] text-[#00bfa5]"
+                                  : "hover:bg-gray-50"
+                              }`}
+                              onClick={() => handleTypeFilter("all")}
+                            >
+                              All Types
+                            </button>
+                            <button
+                              className={`w-full text-left px-3 py-2 rounded-md ${
+                                filterParams.typeFilter === "change"
+                                  ? "bg-[#e3f2fd] text-[#00bfa5]"
+                                  : "hover:bg-gray-50"
+                              }`}
+                              onClick={() => handleTypeFilter("change")}
+                            >
+                              Changes
+                            </button>
+                            <button
+                              className={`w-full text-left px-3 py-2 rounded-md ${
+                                filterParams.typeFilter === "add"
+                                  ? "bg-[#e3f2fd] text-[#00bfa5]"
+                                  : "hover:bg-gray-50"
+                              }`}
+                              onClick={() => handleTypeFilter("add")}
+                            >
+                              Additions
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Maker</TableHead>
                 <TableHead>Checker</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead>Comments</TableHead>               
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    Updated
+                    <div className="flex flex-col gap-0 ml-1.5">
+                      <div
+                        className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      filterParams.sortColumn === "created_at" &&
+                      filterParams.sortDirection === "asc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                        onClick={() => handleSort("created_at")}
+                      >
+                        <ChevronUp
+                          className={`h-2.5 w-2.5 ${
+                            filterParams.sortColumn === "created_at" &&
+                            filterParams.sortDirection === "asc"
+                              ? "text-white stroke-[2.5]"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      </div>
+                      <div
+                        className={`transition-all duration-200 rounded h-3.5 w-3.5 flex items-center justify-center
+                    ${
+                      filterParams.sortColumn === "created_at" &&
+                      filterParams.sortDirection === "desc"
+                        ? "bg-[#00bfa5] p-0.5"
+                        : ""
+                    }`}
+                        onClick={() => handleSort("created_at")}
+                      >
+                        <ChevronDown
+                          className={`h-2.5 w-2.5 ${
+                            filterParams.sortColumn === "created_at" &&
+                            filterParams.sortDirection === "desc"
+                              ? "text-white stroke-[2.5]"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  </TableHead>
+                <TableHead>Comments</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -279,12 +573,15 @@ export const AdminHistory = () => {
                     {request.table_name}
                   </TableCell>
                   <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      request.type === 'change' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {request.type.charAt(0).toUpperCase() + request.type.slice(1)}
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        request.type === "change"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
+                      {request.type.charAt(0).toUpperCase() +
+                        request.type.slice(1)}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -349,7 +646,9 @@ export const AdminHistory = () => {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, total)} of {total} requests
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(currentPage * itemsPerPage, total)} of {total}{" "}
+                requests
               </span>
               <Pagination
                 currentPage={currentPage}
@@ -361,9 +660,11 @@ export const AdminHistory = () => {
         </div>
       )}
 
-
       {/* Details Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      <Dialog
+        open={!!selectedRequest}
+        onOpenChange={() => setSelectedRequest(null)}
+      >
         <DialogContent className="max-w-3xl p-8">
           <div className="flex items-center justify-between mb-8">
             <DialogTitle className="text-2xl font-semibold">
@@ -383,7 +684,9 @@ export const AdminHistory = () => {
                 <div>
                   <h4 className="text-gray-500 font-medium mb-2">Table</h4>
                   <p className="text-lg capitalize text-gray-900">
-                    {selectedRequest.table_name.toLowerCase().replace(/_/g, " ")}
+                    {selectedRequest.table_name
+                      .toLowerCase()
+                      .replace(/_/g, " ")}
                   </p>
                 </div>
                 <div>
@@ -407,11 +710,9 @@ export const AdminHistory = () => {
               <div>
                 <h4 className="text-gray-500 font-medium mb-3">Changes</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  {selectedRequest.type === 'change' ? (
-                    renderChanges(selectedRequest)
-                  ) : (
-                    renderNewRow(selectedRequest.row_data)
-                  )}
+                  {selectedRequest.type === "change"
+                    ? renderChanges(selectedRequest)
+                    : renderNewRow(selectedRequest.row_data)}
                 </div>
               </div>
 
@@ -427,15 +728,4 @@ export const AdminHistory = () => {
       </Dialog>
     </div>
   );
-};
-
-// Helper function to render new row data
-const renderNewRow = (rowData: Record<string, unknown> | undefined) => {
-  if (!rowData) return null;
-  return Object.entries(rowData).map(([key, value], i) => (
-    <div key={i} className="text-gray-700">
-      <span className="text-gray-600">{key}:</span>{" "}
-      <span className="text-[#1A237E] font-medium">{String(value)}</span>
-    </div>
-  ));
 };

@@ -9,7 +9,6 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-// import { API_URL } from "@/config/constants";
 import {
   Table,
   TableBody,
@@ -22,14 +21,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { Pagination } from "@/components/Pagination";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-// import { subDays, startOfDay, endOfDay, isValid } from "date-fns";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select";
 import { fetchCheckerRequests } from "@/services/checkerService";
 
 interface HistoryRequest {
@@ -44,6 +35,11 @@ interface HistoryRequest {
   updated_at: string;
   comments?: string;
   maker_email?: string;
+}
+
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
 }
 
 // Add this type for filter status
@@ -74,6 +70,8 @@ export const History = () => {
   });
   const [totalPages, setTotalPages] = useState(0);
   const [searchText, setSearchText] = useState("");
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
+  const [isLoadingColumns, setIsLoadingColumns] = useState(false);
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
@@ -121,6 +119,59 @@ export const History = () => {
     setDateFilter("custom");
   };
 
+
+  const fetchRenamed = async (tableName: string) => {
+    try {
+      setIsLoadingColumns(true);
+      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch renamed table data');
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setRenamedColumns(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching renamed columns:', error);
+    } finally {
+      setIsLoadingColumns(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRequest?.table_name) {
+      // loadColumnConfig();
+      fetchRenamed(selectedRequest.table_name); // Add this line
+      setCurrentPage(1);
+    } else {
+      setRenamedColumns([]);
+    }
+  }, [selectedRequest]);
+
+  const getDisplayName = (columnName: string) => {
+    if (isLoadingColumns) {
+      return "Loading...";
+    }
+    
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    const mapping = renamedColumns.find(m => m.original_column_name === columnName);
+    return mapping?.renamed_column_name || columnName;
+  };
+ 
   const renderChanges = (
     oldData: Record<string, unknown>,
     newData: Record<string, unknown>
@@ -130,7 +181,7 @@ export const History = () => {
       if (oldData[key] !== newData[key]) {
         // Format: "name: abhijith varaa → abhijith varaai"
         changes.push(
-          `${key}: ${oldData[key] || "null"} → ${newData[key] || "null"}`
+          `${getDisplayName(key)}: ${oldData[key] || "null"} → ${newData[key] || "null"}`
         );
       }
     });

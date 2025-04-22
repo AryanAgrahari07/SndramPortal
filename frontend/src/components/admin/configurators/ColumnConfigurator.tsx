@@ -46,6 +46,11 @@ interface ColumnConfiguratorProps {
   tables: string[];
 }
 
+interface ColumnMapping {
+  original_column_name: string;
+  renamed_column_name: string;
+}
+
 const ITEMS_PER_PAGE = 8;
 
 const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
@@ -57,6 +62,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [tables, setTables] = useState<string[]>(initialTables);
   const [currentPage, setCurrentPage] = useState(1);
+  const [renamedColumns, setRenamedColumns] = useState<ColumnMapping[]>([]);
 
   const totalPages = Math.ceil(columns.length / ITEMS_PER_PAGE);
 
@@ -252,6 +258,53 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
     setColumns(resetColumns);
   };
 
+
+  const fetchRenamed = async (tableName: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch renamed table data');
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setRenamedColumns(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching renamed columns:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedTable) {
+      loadColumnConfig();
+      fetchRenamed(selectedTable); // Add this line
+      setCurrentPage(1);
+    } else {
+      setColumns([]);
+    }
+  }, [selectedTable]);
+
+  const getDisplayName = (columnName: string) => {
+    if (!renamedColumns || renamedColumns.length === 0) {
+      return columnName
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    const mapping = renamedColumns.find(m => m.original_column_name === columnName);
+    return mapping?.renamed_column_name || columnName;
+  };
+
+
   return (
     <div className="space-y-6 p-6 bg-white">
       <div className="space-y-6">
@@ -280,7 +333,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
                   key={column.column_name}
                   className="flex items-center justify-between p-4 rounded-lg border border-[#e3f2fd] bg-white"
                 >
-                  <span className="text-gray-900">{column.column_name}</span>
+                  <span className="text-gray-900">{getDisplayName(column.column_name)}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">
                       {column.column_status === "editable"
