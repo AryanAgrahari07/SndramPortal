@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addTableRow, DropdownConfig } from "@/services/tableDataService";
+import { addTableRow } from "@/services/tableDataService";
 import DynamicDropdown from "@/components/ui/DynamicDropdown";
 import {
   isSymbolAllowed,
@@ -10,6 +10,17 @@ import {
   isSpaceAllowed,
 } from "@/config/ValidationConfig";
 import { sanitizeInput } from "@/utils/security";
+
+interface DropdownConfig {
+  columnName: string;
+  options: string[] | Array<{value: string, parent?: string | null}>;
+  parentColumn?: string;
+}
+
+interface DropdownRelationship {
+  parentColumn: string;
+  childColumn: string;
+}
 
 interface EditRowDrawerProps {
   isOpen: boolean;
@@ -56,6 +67,8 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [filteredOptions, setFilteredOptions] = useState<Record<string, string[]>>({});
+  const [relationships, setRelationships] = useState<DropdownRelationship[]>([]);
   const { toast } = useToast();
 
   const isPrimaryKey = (column: string): boolean => {
@@ -94,6 +107,74 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     }
     setErrors({});
   }, [row, columns, isColumnEditable, dataTypes, tableName]);
+
+  useEffect(() => {
+    const rels: DropdownRelationship[] = [];
+    dropdownColumns.forEach(config => {
+      if (config.parentColumn) {
+        rels.push({
+          parentColumn: config.parentColumn,
+          childColumn: config.columnName
+        });
+      }
+    });
+    setRelationships(rels);
+  }, [dropdownColumns]);
+
+  const fetchFilteredOptions = async (childColumn: string, parentValue: string) => {
+    if (!parentValue) {
+      setFilteredOptions(prev => ({
+        ...prev,
+        [childColumn]: []
+      }));
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:8080/api/dropdowns/${tableName}/${childColumn}/${encodeURIComponent(parentValue)}`,
+        {
+          credentials: "include",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setFilteredOptions(prev => ({
+          ...prev,
+          [childColumn]: data.options || []
+        }));
+      } else {
+        console.error("Failed to fetch filtered options:", data.message);
+        setFilteredOptions(prev => ({
+          ...prev,
+          [childColumn]: []
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching filtered options:", error);
+      setFilteredOptions(prev => ({
+        ...prev,
+        [childColumn]: []
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (row && relationships.length > 0) {
+      relationships.forEach(rel => {
+        const parentValue = row[rel.parentColumn];
+        if (parentValue) {
+          fetchFilteredOptions(rel.childColumn, String(parentValue));
+        }
+      });
+    }
+  }, [row, relationships, tableName]);
 
   const validateField = (column: string, value: unknown): string => {
     if (value === null || value === undefined || value === "") {
@@ -222,6 +303,24 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
       ...prev,
       [column]: sanitizedValue,
     }));
+
+    // Check if this column is a parent for any child columns
+    const childColumns = relationships
+      .filter(rel => rel.parentColumn === column)
+      .map(rel => rel.childColumn);
+
+    // If this column is a parent, fetch filtered options for each child
+    if (childColumns.length > 0 && sanitizedValue) {
+      childColumns.forEach(childColumn => {
+        fetchFilteredOptions(childColumn, sanitizedValue);
+        
+        // Reset child column value when parent changes
+        setFormData(prev => ({
+          ...prev,
+          [childColumn]: ""
+        }));
+      });
+    }
 
     // Validate and set error
     const error = validateField(column, sanitizedValue);
@@ -431,9 +530,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
               <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                 <div className="px-4 py-6 space-y-6 sm:px-6">
                   {columns.map((column) => {
-                    const normalizedColumn = column
-                      .toLowerCase()
-                      .replace(/_/g, "");
+                    const normalizedColumn = column.toLowerCase().replace(/_/g, "");
                     const dropdownConfig = dropdownColumns.find(
                       (dc) =>
                         dc.columnName.toLowerCase().replace(/_/g, "") ===
@@ -449,6 +546,41 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         ? formatDateForInput(row[column] as string)
                         : String(row[column])
                       : "";
+                      
+                    // Check if this column is a child in a relationship
+                    const parentRelationship = relationships.find(rel => rel.childColumn === column);
+                    const isChildDropdown = !!parentRelationship;
+                    
+                    // Get parent value if this is a child dropdown
+                    const parentValue = parentRelationship 
+                      ? formData[parentRelationship.parentColumn] || row?.[parentRelationship.parentColumn]
+                      : null;
+                      
+                    // Get available options - use filtered options for child dropdowns
+                    const availableOptions = isChildDropdown && filteredOptions[column]
+                      ? filteredOptions[column]
+                      : dropdownConfig?.options || [];
+                      
+                    // Make sure options are properly formatted for DynamicDropdown
+                    const formattedOptions = Array.isArray(availableOptions)
+                      ? availableOptions.map(opt => {
+                          if (typeof opt === 'string') {
+                            return {
+                              value: opt,
+                              label: opt
+                            };
+                          } else if (typeof opt === 'object' && opt !== null && 'value' in opt) {
+                            return {
+                              value: opt.value,
+                              label: opt.value
+                            };
+                          }
+                          return {
+                            value: String(opt),
+                            label: String(opt)
+                          };
+                        })
+                      : [];
 
                     return (
                       <div key={column}>
@@ -456,7 +588,12 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                           htmlFor={column}
                           className="block text-sm font-medium text-gray-700 capitalize"
                         >
-                         {getDisplayName(column)}
+                          {getDisplayName(column)}
+                          {isChildDropdown && parentRelationship && (
+                            <span className="ml-2 text-xs text-blue-600">
+                              (Depends on {getDisplayName(parentRelationship.parentColumn)})
+                            </span>
+                          )}
                         </label>
                         {dropdownConfig && isEditable ? (
                           <DynamicDropdown
@@ -466,11 +603,15 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                                 : existingValue
                             }
                             onChange={(value) => handleChange(column, value)}
-                            placeholder="Select a value"
+                            placeholder={
+                              isChildDropdown && !parentValue 
+                                ? `Select ${getDisplayName(parentRelationship.parentColumn)} first`
+                                : "Select a value"
+                            }
                             className="mt-1"
                             options={[
                               ...(existingValue &&
-                              !dropdownConfig.options.includes(existingValue)
+                              !formattedOptions.some(o => o.value === existingValue)
                                 ? [
                                     {
                                       value: existingValue,
@@ -478,12 +619,12 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                                     },
                                   ]
                                 : []),
-                              ...dropdownConfig.options.map((opt) => ({
-                                value: opt,
-                                label: opt,
-                              })),
+                              ...formattedOptions,
                             ]}
-                            disabled={isLoading}
+                            disabled={
+                              isLoading || 
+                              (isChildDropdown && !parentValue) // Disable child dropdown if parent not selected
+                            }
                           />
                         ) : (
                           <input
@@ -511,6 +652,11 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
                         {errors[column] && (
                           <p className="mt-1 text-sm text-red-600">
                             {errors[column]}
+                          </p>
+                        )}
+                        {isChildDropdown && !parentValue && (
+                          <p className="mt-1 text-sm text-amber-600">
+                            Select a {getDisplayName(parentRelationship.parentColumn)} first
                           </p>
                         )}
                       </div>

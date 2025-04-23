@@ -2,12 +2,6 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { EXCLUDED_TABLES } from '@/config/tableConfig';
 
-interface ColumnRename {
-  id: number;
-  table_name: string;
-  original_column_name: string;
-  renamed_column_name: string;
-}
 
 interface TableColumn {
   column_name: string;

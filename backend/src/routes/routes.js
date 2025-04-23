@@ -101,6 +101,7 @@ const { AdminHistory } = require("../controllers/adminHistory/AdminHistory.js");
 const { toggleGroup } = require("../controllers/toggleGroup/toggleGroup.js");
 const { updateColumnRename, getColumnRenames, deleteColumnRename } = require("../controllers/columnRename/columnRename.js");
 const { getRenamed } = require("../controllers/fetchrenamed/fetchrenamed.js");
+const { getDropdownConfig, getFilteredOptions, updateDropdownConfig } = require("../controllers/dropdown/dependentdropdown.js");
 
 
 router.post("/column-rename", verifyToken, authorize("admin"), updateColumnRename);
@@ -247,6 +248,11 @@ router.put(
   authorize("admin"),
   updateRenamedTable
 );
+
+router.get('/api/dropdowns/:tableName', verifyToken, getDropdownConfig);
+router.get('/api/dropdowns/:tableName/:columnName/:parentValue', verifyToken, getFilteredOptions);
+router.put('/api/admin/dropdowns/:tableName', verifyToken, authorize("admin"), updateDropdownConfig);
+
 
 module.exports = router;
 

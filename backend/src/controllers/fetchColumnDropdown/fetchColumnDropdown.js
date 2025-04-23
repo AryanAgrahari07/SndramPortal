@@ -1,57 +1,64 @@
 const { client_update } = require('../../configuration/database/databaseUpdate.js');
 
 exports.fetchColumnDropDown = async (req, res) => {
+    const { table_name, columnName } = req.body;
+  
     try {
-        const { table_name, columnName , existingValue} = req.body;
-
-        if (!table_name || !columnName) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid input. Provide both table_name and columnName.',
-            });
-        }
-
-        const queryFetch = `
+        const query = `
             SELECT dropdown_options 
-            FROM app.dynamic_dropdowns
+            FROM app.dynamic_dropdowns 
             WHERE table_name = $1;
         `;
-
-        const result = await client_update.query(queryFetch, [table_name]);
-
+        
+        const result = await client_update.query(query, [table_name]);
+        
         if (result.rows.length === 0) {
             return res.status(200).json({
-                success: false,
-                message: 'No matching record found for the provided table_name.',
+                success: true,
+                message: "No dropdown options found for this column",
+                data: []
             });
         }
-
+        
         const dropdownOptions = result.rows[0].dropdown_options;
-        const columnData = dropdownOptions.find(option => option.columnName === columnName);
-
-        if (!columnData) {
+        const columnConfig = dropdownOptions.find(config => config.columnName === columnName);
+        
+        if (!columnConfig) {
             return res.status(200).json({
-                success: false,
-                message: `No matching columnName '${columnName}' found in dropdown_options.`,
+                success: true,
+                message: "No dropdown options found for this column",
+                data: []
             });
         }
-
-         // If there's an existing value and it's not in the options, add it
-         if (existingValue && !columnData.options.includes(existingValue)) {
-            columnData.options = [existingValue, ...columnData.options];
+        
+        // Handle both simple and complex option formats
+        let options = [];
+        
+        if (Array.isArray(columnConfig.options)) {
+            options = columnConfig.options.map(opt => {
+                // If it's a dependent option with parent, return only the value
+                if (typeof opt === 'object' && opt.value) {
+                    return opt.value;
+                }
+                // Otherwise return the option directly (simple string option)
+                return opt;
+            });
         }
-
-        res.status(200).json({
+        
+        return res.status(200).json({
             success: true,
-            data: columnData.options,
-            selectedValue: existingValue || null 
+            data: options,
+            dropdown_options: dropdownOptions,
+            // Include additional information for dependent dropdowns
+            hasParent: !!columnConfig.parentColumn,
+            parentColumn: columnConfig.parentColumn || null
         });
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({
+        console.error("Error fetching column dropdown:", error);
+        return res.status(500).json({
             success: false,
-            message: 'An error occurred while fetching the data.',
-            error: error.message,
+            message: "Failed to fetch column dropdown",
+            error: error.message
         });
     }
 };
