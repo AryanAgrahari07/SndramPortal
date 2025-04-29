@@ -210,17 +210,17 @@ exports.verifyOTP = async (req, res) => {
 
 
         res.cookie("sessionid", sessionId, {
-          httpOnly: true, // Allow JavaScript access in development
+          httpOnly: false, // Allow JavaScript access in development
           secure: true, // Allow non-HTTPS in development
-          sameSite: "Strict", // Allow cross-site cookies
+          sameSite: "Lax", // Allow cross-site cookies
           domain: "misadmindev.sundarammutual.com", // Explicitly set domain
           maxAge: 12 * 60 * 60 * 1000, // 12 hours
         });
 
         res.cookie("refreshtoken", refreshToken, {
-          httpOnly: true, // Allow JavaScript access in development
+          httpOnly: false, // Allow JavaScript access in development
           secure: true, // Allow non-HTTPS in development
-          sameSite: "Strict", // Allow cross-site cookies
+          sameSite: "Lax", // Allow cross-site cookies
           domain: "misadmindev.sundarammutual.com", // Explicitly set domain
           maxAge: 20 * 60 * 1000, // 20 minutes
         });

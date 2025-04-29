@@ -36,8 +36,7 @@ exports.refreshToken = async (req, res) => {
 
     await authService.updateSession(session.session_id, newRefreshToken);
 
-
-
+    
     // ------- for sending refresh token to frontend in cookies
 
     // res.cookie("refreshtoken", newRefreshToken, {
@@ -51,9 +50,9 @@ exports.refreshToken = async (req, res) => {
 
 
     res.cookie("refreshtoken", newRefreshToken, {
-      httpOnly: true, // Allow JavaScript access in development
+      httpOnly: false, // Allow JavaScript access in development
       secure: true, // Allow non-HTTPS in development
-      sameSite: "Strict", // Allow cross-site cookies
+      sameSite: "Lax", // Allow cross-site cookies
       domain: "misadmindev.sundarammutual.com", // Explicitly set domain
       maxAge: 20 * 60 * 1000, // 20 minutes
     });

@@ -20,7 +20,7 @@ export class ActivityService {
     }
 
     public initializeActivityTracking(): void {
-        // console.log('Initializing activity tracking');
+        console.log('Initializing activity tracking');
         
         // Clear any existing interval
         if (this.timeoutId) {
