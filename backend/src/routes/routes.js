@@ -102,7 +102,15 @@ const { toggleGroup } = require("../controllers/toggleGroup/toggleGroup.js");
 const { updateColumnRename, getColumnRenames, deleteColumnRename } = require("../controllers/columnRename/columnRename.js");
 const { getRenamed } = require("../controllers/fetchrenamed/fetchrenamed.js");
 const { getDropdownConfig, getFilteredOptions, updateDropdownConfig } = require("../controllers/dropdown/dependentdropdown.js");
-
+// Import validation controller
+const {
+  getValidationRule,
+  upsertValidationRule,
+  deleteValidationRule,
+  toggleValidationRule,
+  getTableValidationRules
+} = require("../controllers/valids/validationController.js");
+const { fetchColumnwithdatatype } = require("../controllers/fetchColumn/fetchcolwithdatatype.js");
 
 router.post("/column-rename", verifyToken, authorize("admin"), updateColumnRename);
 router.get("/columns/:table_name", verifyToken, authorize("admin"), getColumnRenames);
@@ -157,6 +165,7 @@ router.post("/reject", verifyToken, authorize("checker"), reject);
 //column configuration routes
 router.post("/columnPermission", verifyToken, ColumnPermission);
 router.post("/fetchcolumn", verifyToken, fetchColumn);
+router.post("/fetchcolumnwithdatatype", verifyToken, fetchColumnwithdatatype);
 
 //dropdown configuratuon routes
 router.post("/fetchColumnDropDown", verifyToken, fetchColumnDropDown);
@@ -254,6 +263,42 @@ router.get('/api/dropdowns/:tableName/:columnName/:parentValue', verifyToken, ge
 router.put('/api/admin/dropdowns/:tableName', verifyToken, authorize("admin"), updateDropdownConfig);
 
 
+
+
+// Validation routes
+router.get(
+  "/admin/validations/:tableName",
+  verifyToken,
+  getTableValidationRules
+);
+
+router.get(
+  "/admin/validations/:tableName/:columnName",
+  verifyToken,
+  authorize("admin"),
+  getValidationRule
+);
+
+router.post(
+  "/admin/validations/rules",
+  verifyToken,
+  authorize("admin"),
+  upsertValidationRule
+);
+
+router.delete(
+  "/admin/validations/:tableName/:columnName",
+  verifyToken,
+  authorize("admin"),
+  deleteValidationRule
+);
+
+router.patch(
+  "/admin/validations/:tableName/:columnName/status",
+  verifyToken,
+  authorize("admin"),
+  toggleValidationRule
+);
 module.exports = router;
 
 // POST /highlight-cells - Manages cell highlighting in tables for makers// GET /maker-notification - Gets notifications for maker role

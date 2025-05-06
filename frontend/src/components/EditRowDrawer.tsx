@@ -4,12 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 import { addTableRow } from "@/services/tableDataService";
 import DynamicDropdown from "@/components/ui/DynamicDropdown";
 import {
-  isSymbolAllowed,
-  isNumberAllowed,
   preventXSS,
-  isSpaceAllowed,
 } from "@/config/ValidationConfig";
 import { sanitizeInput } from "@/utils/security";
+import axios from "axios";
 
 interface DropdownConfig {
   columnName: string;
@@ -20,6 +18,31 @@ interface DropdownConfig {
 interface DropdownRelationship {
   parentColumn: string;
   childColumn: string;
+}
+
+interface ValidationRule {
+  allow_numbers: boolean;
+  allow_special_chars: boolean;
+  allow_spaces: boolean;
+  min_length?: number;
+  max_length?: number;
+  regex_pattern?: string;
+  custom_error_message?: string;
+  min_value?: number;
+  max_value?: number;
+  decimal_places?: number;
+  min_date?: string;
+  max_date?: string;
+  allow_weekends?: boolean;
+  number_sign?: 'positive' | 'negative' | 'non_negative' | 'non_positive';
+  parity?: 'even' | 'odd';
+  date_restriction?: 'past' | 'future' | 'custom';
+  days_from_today?: number;
+  case_restriction?: 'uppercase' | 'lowercase';
+}
+
+interface ValidationRules {
+  [key: string]: ValidationRule;
 }
 
 interface EditRowDrawerProps {
@@ -70,6 +93,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
   const [filteredOptions, setFilteredOptions] = useState<Record<string, string[]>>({});
   const [relationships, setRelationships] = useState<DropdownRelationship[]>([]);
   const { toast } = useToast();
+  const [validationRules, setValidationRules] = useState<ValidationRules>({});
 
   const isPrimaryKey = (column: string): boolean => {
     const expectedPkName = `${tableName}_sk`.toLowerCase();
@@ -176,123 +200,277 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     }
   }, [row, relationships, tableName]);
 
+  // Fetch validation rules when component mounts or table changes
+  useEffect(() => {
+    const fetchValidationRules = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:8080/admin/validations/${tableName}`,
+          {
+            withCredentials: true,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        if (response.data.success) {
+          // Convert array of rules to an object keyed by column_name
+          const rules = response.data.data.reduce((acc: ValidationRules, rule: ValidationRule & { column_name: string }) => {
+            acc[rule.column_name] = rule;
+            return acc;
+          }, {});
+          setValidationRules(rules);
+        }
+      } catch (error) {
+        console.error("Error fetching validation rules:", error);
+      }
+    };
+
+    if (tableName) {
+      fetchValidationRules();
+    }
+  }, [tableName]);
+
   const validateField = (column: string, value: unknown): string => {
+    // Allow empty values
     if (value === null || value === undefined || value === "") {
-      return "This field cannot be empty";
+      return "";
     }
 
     const stringValue = String(value).trim();
+    const validationRule = validationRules[column];
+    const dataType = dataTypes[column]?.toLowerCase();
 
     // SQL Injection Prevention
-    const sqlInjectionPattern =
-      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
+    const sqlInjectionPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
     if (sqlInjectionPattern.test(stringValue)) {
       return "Invalid input: Contains potentially harmful characters or keywords";
     }
 
-    const normalizedColumn = column.toLowerCase();
-    const dataType = dataTypes[column]?.toLowerCase();
-
-    if (dataType === "text" || dataType?.includes("character varying")) {
-      // Symbol validation
-      if (!isSymbolAllowed(normalizedColumn)) {
+    if (validationRule) {
+      // Special characters validation
+      if (!validationRule.allow_special_chars) {
         const symbolRegex = /[!@#$%^&*()+=\[\]{};:'"\\|,.<>/?`~\-_]/;
         if (symbolRegex.test(stringValue)) {
-          return "Special characters are not allowed in this field";
+          return validationRule.custom_error_message || "Special characters are not allowed in this field";
         }
       }
 
-      // Number validation
-      if (
-        !isNumberAllowed(normalizedColumn) &&
-        !normalizedColumn.includes("id")
-      ) {
+      // Numbers validation
+      if (!validationRule.allow_numbers) {
         const numberRegex = /\d/;
         if (numberRegex.test(stringValue)) {
-          return "Numbers are not allowed in this field";
+          return validationRule.custom_error_message || "Numbers are not allowed in this field";
         }
       }
 
-      const stv = String(value);
-      // Space validation
-      if (!isSpaceAllowed(column)) {
-        // New function to check
-        if (stv.includes(" ")) {
-          return "Spaces are not allowed in this field";
+      // Spaces validation
+      if (!validationRule.allow_spaces) {
+        if (stringValue.includes(' ')) {
+          return validationRule.custom_error_message || "Spaces are not allowed in this field";
         }
       }
 
-      // Email validation
-      if (
-        normalizedColumn.includes("email") ||
-        normalizedColumn.includes("mail")
-      ) {
-        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-        if (!emailRegex.test(stringValue)) {
-          return "Please enter a valid email address";
+      // Length validations (only for non-date fields)
+      if (!dataType.includes('date') && !dataType.includes('timestamp')) {
+        if (validationRule.min_length && stringValue.length < validationRule.min_length) {
+          return `Minimum length should be ${validationRule.min_length} characters`;
+        }
+
+        if (validationRule.max_length && stringValue.length > validationRule.max_length) {
+          return `Maximum length should be ${validationRule.max_length} characters`;
         }
       }
 
-      // Number validation
-      if (
-        normalizedColumn.includes("phone") ||
-        normalizedColumn.includes("mobile")
-      ) {
-        const phoneRegex = /^\+?[\d\s-]{10,}$/;
-        if (!phoneRegex.test(stringValue)) {
-          return "Please enter a valid phone number";
+      // Case restriction validation for text fields
+      if ((dataType.includes('character varying') || dataType.includes('text')) && validationRule.case_restriction) {
+        switch (validationRule.case_restriction) {
+          case 'uppercase':
+            if (stringValue !== stringValue.toUpperCase()) {
+              return "Value must be in uppercase";
+            }
+            break;
+          case 'lowercase':
+            if (stringValue !== stringValue.toLowerCase()) {
+              return "Value must be in lowercase";
+            }
+            break;
+        }
+      }
+
+      // Regex pattern validation
+      if (validationRule.regex_pattern) {
+        try {
+          const regex = new RegExp(validationRule.regex_pattern);
+          if (!regex.test(stringValue)) {
+            return validationRule.custom_error_message || "Input format is invalid";
+          }
+        } catch (error) {
+          console.error('Invalid regex pattern:', error);
         }
       }
     }
 
-    if (!dataType) return "";
-
+    // Data type validations
     switch (dataType) {
       case "integer":
+      case "numeric":
+      case "decimal": {
         const numValue = Number(stringValue);
-        if (isNaN(numValue) || !Number.isInteger(numValue)) {
+        if (isNaN(numValue)) {
+          return "Must be a valid number";
+        }
+
+        if (dataType === "integer" && !Number.isInteger(numValue)) {
           return "Must be a valid integer";
         }
-        break;
 
-      case "date":
-        const dateValue = new Date(stringValue);
-        if (isNaN(dateValue.getTime())) {
-          return "Must be a valid date (YYYY-MM-DD)";
+        if (validationRule) {
+          // Number sign validations
+          if (validationRule.number_sign) {
+            switch (validationRule.number_sign) {
+              case 'positive':
+                if (numValue <= 0) {
+                  return "Value must be positive (> 0)";
+                }
+                break;
+              case 'negative':
+                if (numValue >= 0) {
+                  return "Value must be negative (< 0)";
+                }
+                break;
+              case 'non_negative':
+                if (numValue < 0) {
+                  return "Value must be non-negative (≥ 0)";
+                }
+                break;
+              case 'non_positive':
+                if (numValue > 0) {
+                  return "Value must be non-positive (≤ 0)";
+                }
+                break;
+            }
+          }
+
+          // Parity validations
+          if (validationRule.parity && Number.isInteger(numValue)) {
+            switch (validationRule.parity) {
+              case 'even':
+                if (numValue % 2 !== 0) {
+                  return "Value must be an even number";
+                }
+                break;
+              case 'odd':
+                if (numValue % 2 === 0) {
+                  return "Value must be an odd number";
+                }
+                break;
+            }
+          }
+
+          if (typeof validationRule.min_value === 'number' && numValue < validationRule.min_value) {
+            return `Value must be greater than or equal to ${validationRule.min_value}`;
+          }
+          if (typeof validationRule.max_value === 'number' && numValue > validationRule.max_value) {
+            return `Value must be less than or equal to ${validationRule.max_value}`;
+          }
+          if (typeof validationRule.decimal_places === 'number') {
+            const decimalParts = stringValue.split('.');
+            if (decimalParts[1] && decimalParts[1].length > validationRule.decimal_places) {
+              return `Maximum ${validationRule.decimal_places} decimal places allowed`;
+            }
+          }
         }
         break;
+      }
 
-      case "uuid":
-        const uuidRegex =
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      case "date":
+      case "timestamp":
+      case "timestamp without time zone":
+      case "timestamp with time zone": {
+        const dateValue = new Date(stringValue);
+        if (isNaN(dateValue.getTime())) {
+          return "Must be a valid date";
+        }
+
+        if (validationRule) {
+          // Date restriction validations
+          if (validationRule.date_restriction) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            switch (validationRule.date_restriction) {
+                case 'past':
+                  if (dateValue >= today) {
+                    return "Date must be in the past";
+                  }
+                  break;
+                case 'future':
+                  if (dateValue <= today) {
+                    return "Date must be in the future";
+                  }
+                  break;
+                case 'custom':
+                  if (validationRule.days_from_today) {
+                    const limitDate = new Date(today);
+                    limitDate.setHours(0, 0, 0, 0);
+                    const inputDate = new Date(dateValue);
+                    inputDate.setHours(0, 0, 0, 0);
+
+                    if (validationRule.days_from_today > 0) {
+                      // Future date validation
+                      limitDate.setDate(today.getDate() + validationRule.days_from_today);
+                      if (inputDate > limitDate) {
+                        return `Date cannot be more than ${validationRule.days_from_today} days in the future`;
+                      }
+                    } else {
+                      // Past date validation
+                      // For negative days_from_today, calculate the earliest allowed date
+                      limitDate.setDate(today.getDate() + validationRule.days_from_today);
+                      if (inputDate < limitDate) {
+                        return `Date must be within the last ${Math.abs(validationRule.days_from_today)} days`;
+                      }
+                      if (inputDate > today) {
+                        return `Date must be in the past`;
+                      }
+                    }
+                  }
+                  break;
+            }
+          }
+
+          if (validationRule.min_date && dateValue < new Date(validationRule.min_date)) {
+            return `Date must be after ${new Date(validationRule.min_date).toLocaleDateString()}`;
+          }
+          if (validationRule.max_date && dateValue > new Date(validationRule.max_date)) {
+            return `Date must be before ${new Date(validationRule.max_date).toLocaleDateString()}`;
+          }
+          if (validationRule.allow_weekends === false) {
+            const day = dateValue.getDay();
+            if (day === 0 || day === 6) {
+              return "Weekend dates are not allowed";
+            }
+          }
+        }
+        break;
+      }
+
+      case "uuid": {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(stringValue)) {
           return "Must be a valid UUID";
         }
         break;
+      }
 
-      case "numeric":
-      case "decimal":
-        const numericValue = Number(stringValue);
-        if (isNaN(numericValue)) {
-          return "Must be a valid number";
-        }
-        break;
-
-      case "boolean":
+      case "boolean": {
         if (!["true", "false", "0", "1"].includes(stringValue.toLowerCase())) {
           return "Must be true or false";
         }
         break;
-
-      case "timestamp":
-      case "timestamp without time zone":
-      case "timestamp with time zone":
-        const timestampValue = new Date(stringValue);
-        if (isNaN(timestampValue.getTime())) {
-          return "Must be a valid timestamp";
-        }
-        break;
+      }
     }
+
     return "";
   };
 
@@ -343,10 +521,9 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     Object.entries(formData).forEach(([column, value]) => {
       const stringValue = String(value || "").trim();
 
+      // Only validate non-empty fields
       if (stringValue !== "") {
         hasAtLeastOneValue = true;
-
-        // Validate non-empty fields
         const error = validateField(column, value);
         if (error) {
           newErrors[column] = error;

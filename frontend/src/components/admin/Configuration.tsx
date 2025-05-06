@@ -4,8 +4,9 @@ import DropdownManager from "./configurators/DropdownManager";
 import GroupConfiguration from "./configurators/GroupConfiguration";
 import TableConfigurator from "./configurators/TableConfigurator";
 import ColumnRenamer from "./configurators/ColumnRenamer";
+import ValidationConfigurator from "./configurators/ValidationConfigurator";
 
-type TabType = "column" | "dropdown" | "group" | "table" | "rename";
+type TabType = "column" | "dropdown" | "group" | "table" | "rename" | "validation";
 
 const Configuration = () => {
   const [activeTab, setActiveTab] = useState<TabType>("column");
@@ -22,6 +23,8 @@ const Configuration = () => {
         return <TableConfigurator />;
       case "rename":
         return <ColumnRenamer />;
+      case "validation":
+        return <ValidationConfigurator />;
       default:
         return null;
     }
@@ -71,16 +74,27 @@ const Configuration = () => {
           Table Configuration
         </button>
 
-        <button
-           onClick={() => setActiveTab("rename")}
-           className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
-             activeTab === "rename"
-               ? "bg-[#0F172A] text-white"
-               : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-           }`}
-        >
-          Rename Columns
-        </button>
+          <button
+            onClick={() => setActiveTab("rename")}
+            className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === "rename"
+                ? "bg-[#0F172A] text-white"
+                : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Rename Columns
+          </button>
+
+          <button
+            onClick={() => setActiveTab("validation")}
+            className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === "validation"
+                ? "bg-[#0F172A] text-white"
+                : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Validation Configuration
+          </button>
       </div>
 
       <div className="bg-[#F8FAFC] min-h-[calc(100vh-36rem)]">

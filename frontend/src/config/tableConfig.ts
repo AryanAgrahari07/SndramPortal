@@ -9,5 +9,6 @@ export const EXCLUDED_TABLES = [
     'group_table',
     'column_permission',
     'dynamic_dropdowns',
+    'column_renames'
     // Add any other tables you want to hide
   ];
