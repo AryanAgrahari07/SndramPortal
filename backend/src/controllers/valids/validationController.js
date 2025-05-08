@@ -88,7 +88,8 @@ exports.upsertValidationRule = async (req, res) => {
       allow_weekends,
       is_active,
       date_restriction,
-      days_from_today,
+      days_in_past,
+      days_in_future,
       case_restriction,
       number_sign,
       parity
@@ -104,6 +105,10 @@ exports.upsertValidationRule = async (req, res) => {
     `;
     const typeResult = await client_update.query(typeQuery, [table_name, column_name]);
     const data_type = typeResult.rows[0]?.data_type;
+
+    // If date_restriction is 'custom', ensure days_in_past and days_in_future are handled correctly
+    const finalDaysInPast = date_restriction === 'custom' ? days_in_past : null;
+    const finalDaysInFuture = date_restriction === 'custom' ? days_in_future : null;
 
     const query = `
       INSERT INTO app.column_validations (
@@ -125,7 +130,8 @@ exports.upsertValidationRule = async (req, res) => {
         allow_weekends,
         is_active,
         date_restriction,
-        days_from_today,
+        days_in_past,
+        days_in_future,
         case_restriction,
         number_sign,
         parity,
@@ -133,7 +139,12 @@ exports.upsertValidationRule = async (req, res) => {
         updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22,
+        CASE 
+          WHEN $18 = 'none' THEN NULL 
+          WHEN $18 IN ('past', 'future', 'today', 'custom') THEN $18
+          ELSE NULL 
+        END,
+        $19, $20, $21, $22, $23,
         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       )
       ON CONFLICT (table_name, column_name) DO UPDATE SET
@@ -153,7 +164,8 @@ exports.upsertValidationRule = async (req, res) => {
         allow_weekends = EXCLUDED.allow_weekends,
         is_active = EXCLUDED.is_active,
         date_restriction = EXCLUDED.date_restriction,
-        days_from_today = EXCLUDED.days_from_today,
+        days_in_past = EXCLUDED.days_in_past,
+        days_in_future = EXCLUDED.days_in_future,
         case_restriction = EXCLUDED.case_restriction,
         number_sign = EXCLUDED.number_sign,
         parity = EXCLUDED.parity,
@@ -180,7 +192,8 @@ exports.upsertValidationRule = async (req, res) => {
       allow_weekends,
       is_active,
       date_restriction,
-      days_from_today,
+      finalDaysInPast,
+      finalDaysInFuture,
       case_restriction,
       number_sign,
       parity

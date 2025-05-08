@@ -204,52 +204,109 @@ const validateField = async (columnName, value, dataType, validationRule) => {
     case "date":
     case "timestamp":
     case "timestamp without time zone":
-    case "timestamp with time zone":
+    case "timestamp with time zone": {
       const dateValue = new Date(stringValue);
       if (isNaN(dateValue.getTime())) {
         return "Must be a valid date";
       }
+
       if (validationRule) {
         // Date restriction validations
         if (validationRule.date_restriction) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
+          const inputDate = new Date(dateValue);
+          inputDate.setHours(0, 0, 0, 0);
 
           switch (validationRule.date_restriction) {
             case 'past':
-              if (dateValue >= today) {
-                return "Date must be in the past";
+              if (inputDate > today) {
+                return "Date must be in the past or today";
               }
               break;
             case 'future':
-              if (dateValue <= today) {
-                return "Date must be in the future";
+              if (inputDate < today) {
+                return "Date must be in the future or today";
+              }
+              break;
+            case 'today':
+              if (inputDate.getTime() !== today.getTime()) {
+                return "Date must be today";
               }
               break;
             case 'custom':
-              if (validationRule.days_from_today) {
-                const limitDate = new Date(today);
-                limitDate.setDate(today.getDate() + validationRule.days_from_today);
-                if (validationRule.days_from_today > 0) {
-                  if (dateValue > limitDate) {
-                    return `Date cannot be more than ${validationRule.days_from_today} days in the future`;
-                  }
-                } else {
-                  if (dateValue < limitDate) {
-                    return `Date cannot be more than ${Math.abs(validationRule.days_from_today)} days in the past`;
-                  }
+              const pastLimit = validationRule.days_in_past;
+              const futureLimit = validationRule.days_in_future;
+
+              // Skip validation if both limits are null/undefined/empty
+              if ((pastLimit === null || pastLimit === undefined) && 
+                  (futureLimit === null || futureLimit === undefined)) {
+                break;
+              }
+
+              let pastDate = null;
+              let futureDate = null;
+
+              // Only create pastDate if pastLimit is defined and greater than 0
+              if (pastLimit !== null && pastLimit !== undefined && pastLimit > 0) {
+                pastDate = new Date(today);
+                pastDate.setDate(today.getDate() - pastLimit);
+                pastDate.setHours(0, 0, 0, 0);
+              }
+
+              // Only create futureDate if futureLimit is defined and greater than 0
+              if (futureLimit !== null && futureLimit !== undefined && futureLimit > 0) {
+                futureDate = new Date(today);
+                futureDate.setDate(today.getDate() + futureLimit);
+                futureDate.setHours(0, 0, 0, 0);
+              }
+
+              // Validate based on which limits are set
+              if (pastDate && futureDate) {
+                // Both limits are set and greater than 0
+                if (inputDate < pastDate || inputDate > futureDate) {
+                  return `Date must be between ${pastLimit} days in the past and ${futureLimit} days in the future from today`;
                 }
+              } else if (pastDate && !futureDate) {
+                // Only past limit is set and greater than 0
+                if (inputDate < pastDate) {
+                  return `Date must not be more than ${pastLimit} days in the past`;
+                }
+              } else if (!pastDate && futureDate) {
+                // Only future limit is set and greater than 0
+                if (inputDate > futureDate) {
+                  return `Date must not be more than ${futureLimit} days in the future`;
+                }
+              }
+
+              // Handle cases where either limit is 0
+              if (pastLimit === 0 && inputDate < today) {
+                return "Past dates are not allowed";
+              }
+              if (futureLimit === 0 && inputDate > today) {
+                return "Future dates are not allowed";
               }
               break;
           }
         }
 
-        if (validationRule.min_date && dateValue < new Date(validationRule.min_date)) {
-          return `Date must be after ${new Date(validationRule.min_date).toLocaleDateString()}`;
+        // Absolute date range validations (separate from relative date validations)
+        if (validationRule.min_date) {
+          const minDate = new Date(validationRule.min_date);
+          minDate.setHours(0, 0, 0, 0);
+          if (dateValue < minDate) {
+            return `Date must be on or after ${minDate.toLocaleDateString()}`;
+          }
         }
-        if (validationRule.max_date && dateValue > new Date(validationRule.max_date)) {
-          return `Date must be before ${new Date(validationRule.max_date).toLocaleDateString()}`;
+
+        if (validationRule.max_date) {
+          const maxDate = new Date(validationRule.max_date);
+          maxDate.setHours(0, 0, 0, 0);
+          if (dateValue > maxDate) {
+            return `Date must be on or before ${maxDate.toLocaleDateString()}`;
+          }
         }
+
         if (validationRule.allow_weekends === false) {
           const day = dateValue.getDay();
           if (day === 0 || day === 6) {
@@ -258,6 +315,7 @@ const validateField = async (columnName, value, dataType, validationRule) => {
         }
       }
       break;
+    }
 
     case "uuid":
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -50,8 +50,11 @@ exports.AdminHistory = async (req, res) => {
           maker_user.email as maker_email,
           art.admin as checker,
           admin_user.email as checker_email,
-          art.status,
-          art.created_at,
+          CASE 
+            WHEN art.status = 'approve' THEN 'approved'
+            ELSE art.status 
+          END as status,
+          art.updated_at as created_at,
           art.comments,
           NULL::text as old_data,
           NULL::text as new_data,
@@ -62,7 +65,7 @@ exports.AdminHistory = async (req, res) => {
         FROM app.add_row_table art
         LEFT JOIN app.users maker_user ON art.maker = maker_user.user_id::text
         LEFT JOIN app.users admin_user ON art.admin = admin_user.user_id::text
-        WHERE art.status IN ('approved', 'rejected')
+        WHERE art.status IN ('approve', 'rejected')
       )
       SELECT * FROM (
         SELECT * FROM change_history
@@ -102,13 +105,13 @@ exports.AdminHistory = async (req, res) => {
     }
 
     if (from) {
-      whereClauses.push(`created_at >= $${paramCount}`);
+      whereClauses.push(`created_at >= $${paramCount}::timestamp`);
       params.push(from);
       paramCount++;
     }
 
     if (to) {
-      whereClauses.push(`created_at <= $${paramCount}`);
+      whereClauses.push(`created_at <= ($${paramCount}::timestamp + interval '1 day')`);
       params.push(to);
       paramCount++;
     }

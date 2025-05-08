@@ -42,11 +42,12 @@ interface ValidationRule {
   max_date?: string;
   allow_weekends: boolean;
   is_active: boolean;
-  date_restriction?: 'past' | 'future' | 'custom';
-  days_from_today?: number;
+  date_restriction?: 'past' | 'future' | 'today' | 'custom';
+  days_in_past?: number;
+  days_in_future?: number;
+  case_restriction?: 'uppercase' | 'lowercase';
   number_sign?: 'positive' | 'negative' | 'non_negative' | 'non_positive';
   parity?: 'even' | 'odd';
-  case_restriction?: 'uppercase' | 'lowercase';
 }
 
 interface Column {
@@ -61,6 +62,8 @@ const ValidationConfigurator: React.FC = () => {
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [validationRule, setValidationRule] = useState<ValidationRule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // const [showDecimalConfig, setShowDecimalConfig] = useState(false);
+  // const [showMinMaxConfig, setShowMinMaxConfig] = useState(false);
   const { toast } = useToast();
 
   // Fetch tables
@@ -108,10 +111,16 @@ const ValidationConfigurator: React.FC = () => {
           }
         );
         if (response.data.success) {
-          const columnData = response.data.columns.map((col: Column) => ({
-            name: col.name,
-            type: col.type // Default to text since type info isn't provided in the response
-          }));
+          // Filter out columns that match tableName_sk pattern
+          const columnData = response.data.columns
+            .filter((col: Column) => {
+              const expectedPkName = `${selectedTable}_sk`.toLowerCase();
+              return col.name.toLowerCase() !== expectedPkName;
+            })
+            .map((col: Column) => ({
+              name: col.name,
+              type: col.type
+            }));
           setColumns(columnData);
         }
       } catch (error) {
@@ -316,51 +325,53 @@ const ValidationConfigurator: React.FC = () => {
           {selectedColumn && validationRule && (
             <div className="space-y-4 pt-4">
               <div className="space-y-4">
-                {/* Basic Validations */}
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={validationRule.allow_numbers}
-                      onCheckedChange={(checked) =>
-                        setValidationRule({
-                          ...validationRule,
-                          allow_numbers: checked,
-                        })
-                      }
-                      aria-label="Allow numbers toggle"
-                    />
-                    <Label>Allow Numbers</Label>
+                {/* Basic Validations - Only show for character varying and text fields */}
+                {(getColumnDataType().includes('character varying') || getColumnDataType().includes('text')) && (
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={validationRule.allow_numbers}
+                        onCheckedChange={(checked) =>
+                          setValidationRule({
+                            ...validationRule,
+                            allow_numbers: checked,
+                          })
+                        }
+                        aria-label="Allow numbers toggle"
+                      />
+                      <Label>Allow Numbers</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={validationRule.allow_special_chars}
+                        onCheckedChange={(checked) =>
+                          setValidationRule({
+                            ...validationRule,
+                            allow_special_chars: checked,
+                          })
+                        }
+                        aria-label="Allow special characters toggle"
+                      />
+                      <Label>Allow Special Characters</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={validationRule.allow_spaces}
+                        onCheckedChange={(checked) =>
+                          setValidationRule({
+                            ...validationRule,
+                            allow_spaces: checked,
+                          })
+                        }
+                        aria-label="Allow spaces toggle"
+                      />
+                      <Label>Allow Spaces</Label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={validationRule.allow_special_chars}
-                      onCheckedChange={(checked) =>
-                        setValidationRule({
-                          ...validationRule,
-                          allow_special_chars: checked,
-                        })
-                      }
-                      aria-label="Allow special characters toggle"
-                    />
-                    <Label>Allow Special Characters</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={validationRule.allow_spaces}
-                      onCheckedChange={(checked) =>
-                        setValidationRule({
-                          ...validationRule,
-                          allow_spaces: checked,
-                        })
-                      }
-                      aria-label="Allow spaces toggle"
-                    />
-                    <Label>Allow Spaces</Label>
-                  </div>
-                </div>
+                )}
 
                 {/* Date Validations */}
-                {getColumnDataType().includes('date') || getColumnDataType().includes('timestamp') ? (
+                {(getColumnDataType().includes('date') || getColumnDataType().includes('timestamp')) && (
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="font-medium">Date Validations</h3>
                     
@@ -370,11 +381,11 @@ const ValidationConfigurator: React.FC = () => {
                       <Select
                         value={validationRule.date_restriction || "none"}
                         onValueChange={(value) => {
-                          // Clear days_from_today when changing away from custom
                           setValidationRule({
                             ...validationRule,
-                            date_restriction: value as 'past' | 'future' | 'custom',
-                            days_from_today: value === 'custom' ? validationRule.days_from_today : undefined
+                            date_restriction: value as 'past' | 'future' | 'today' | 'custom',
+                            days_in_past: value === 'custom' ? validationRule.days_in_past : undefined,
+                            days_in_future: value === 'custom' ? validationRule.days_in_future : undefined
                           });
                         }}
                       >
@@ -383,64 +394,93 @@ const ValidationConfigurator: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent className="bg-white">
                           <SelectItem value="none">No restriction</SelectItem>
-                          <SelectItem value="past">Past dates only</SelectItem>
-                          <SelectItem value="future">Future dates only</SelectItem>
-                          <SelectItem value="custom">Custom days from today</SelectItem>
+                          <SelectItem value="past">Past dates (including today)</SelectItem>
+                          <SelectItem value="future">Future dates (including today)</SelectItem>
+                          <SelectItem value="today">Today only</SelectItem>
+                          <SelectItem value="custom">Custom days range</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Days from Today - Only show when date_restriction is 'custom' */}
+                    {/* Custom Days Range - Only show when date_restriction is 'custom' */}
                     {validationRule.date_restriction === 'custom' && (
-                      <div className="space-y-2">
-                        <Label>Days from Today</Label>
-                        <div className="space-y-1">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Days in Past (from today)</Label>
                           <Input
                             type="number"
-                            value={validationRule.days_from_today || ""}
+                            min="0"
+                            value={validationRule.days_in_past ?? ""}
                             onChange={(e) =>
                               setValidationRule({
                                 ...validationRule,
-                                days_from_today: parseInt(e.target.value) || undefined,
+                                days_in_past: e.target.value === "" ? undefined : parseInt(e.target.value),
                               })
                             }
-                            placeholder="Enter number of days (e.g. +7 or -7)"
+                            placeholder="Enter number of days in past"
                           />
                           <p className="text-sm text-muted-foreground">
-                            Use positive numbers (+7) for future dates or negative numbers (-7) for past dates
+                            Leave empty for no past restriction, 0 to block past dates
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Days in Future (from today)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={validationRule.days_in_future ?? ""}
+                            onChange={(e) =>
+                              setValidationRule({
+                                ...validationRule,
+                                days_in_future: e.target.value === "" ? undefined : parseInt(e.target.value),
+                              })
+                            }
+                            placeholder="Enter number of days in future"
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Leave empty for no future restriction, 0 to block future dates
                           </p>
                         </div>
                       </div>
                     )}
 
-                    {/* Min Date */}
-                    <div className="space-y-2">
-                      <Label>Minimum Date</Label>
-                      <Input
-                        type="date"
-                        value={validationRule.min_date || ""}
-                        onChange={(e) =>
-                          setValidationRule({
-                            ...validationRule,
-                            min_date: e.target.value || undefined,
-                          })
-                        }
-                      />
-                    </div>
+                    {/* Absolute Date Range */}
+                    <div className="space-y-4 border-t pt-4">
+                      <h3 className="font-medium">Absolute Date Range (Optional)</h3>
+                      <div className="space-y-2">
+                        <Label>Minimum Date</Label>
+                        <Input
+                          type="date"
+                          value={validationRule.min_date || ""}
+                          onChange={(e) =>
+                            setValidationRule({
+                              ...validationRule,
+                              min_date: e.target.value || undefined,
+                            })
+                          }
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Set a fixed minimum date (independent of relative days)
+                        </p>
+                      </div>
 
-                    {/* Max Date */}
-                    <div className="space-y-2">
-                      <Label>Maximum Date</Label>
-                      <Input
-                        type="date"
-                        value={validationRule.max_date || ""}
-                        onChange={(e) =>
-                          setValidationRule({
-                            ...validationRule,
-                            max_date: e.target.value || undefined,
-                          })
-                        }
-                      />
+                      <div className="space-y-2">
+                        <Label>Maximum Date</Label>
+                        <Input
+                          type="date"
+                          value={validationRule.max_date || ""}
+                          onChange={(e) =>
+                            setValidationRule({
+                              ...validationRule,
+                              max_date: e.target.value || undefined,
+                            })
+                          }
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Set a fixed maximum date (independent of relative days)
+                        </p>
+                      </div>
                     </div>
 
                     {/* Weekend Restriction */}
@@ -458,10 +498,10 @@ const ValidationConfigurator: React.FC = () => {
                       <Label>Allow Weekends</Label>
                     </div>
                   </div>
-                ) : null}
+                )}
 
-                {/* Length Validations - Only show for non-date fields */}
-                {!getColumnDataType().includes('date') && !getColumnDataType().includes('timestamp') && (
+                {/* Length Validations - Only show for character varying and text fields */}
+                {(getColumnDataType().includes('character varying') || getColumnDataType().includes('text')) && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Minimum Length</Label>
@@ -493,85 +533,166 @@ const ValidationConfigurator: React.FC = () => {
                 )}
 
                 {/* Numeric Validations */}
-                {getColumnDataType().includes('int') || getColumnDataType().includes('numeric') ? (
+                {(getColumnDataType().includes('int') || 
+                  getColumnDataType().includes('numeric') || 
+                  getColumnDataType().includes('character varying') || 
+                  getColumnDataType().includes('text')) && (
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="font-medium">Numeric Validations</h3>
                     
-                    {/* Predefined Patterns for Numbers */}
+                    {/* Decimal Places Configuration - Only for non-integer fields */}
+                    {!getColumnDataType().includes('int') && (
+                      <div className="space-y-2">
+                        <Label>Decimal Places</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={validationRule?.decimal_places ?? ""}
+                          onChange={(e) =>
+                            setValidationRule({
+                              ...validationRule,
+                              decimal_places: e.target.value === "" ? undefined : parseInt(e.target.value)
+                            })
+                          }
+                          placeholder="Enter number of decimal places allowed"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Set the number of decimal places allowed (leave empty for no restriction)
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Min/Max Value Configuration */}
                     <div className="space-y-2">
-                      <Label>Predefined Pattern</Label>
-                      <Select
-                        value={validationRule.regex_pattern || "none"}
-                        onValueChange={(value) =>
-                          setValidationRule({
-                            ...validationRule,
-                            regex_pattern: value === "none" ? "" : value,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="bg-white">
-                          <SelectValue placeholder="Select pattern" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          <SelectItem value="none">No pattern</SelectItem>
-                          <SelectItem value="^[0-9]{10}$">Phone Number (10 digits)</SelectItem>
-                          <SelectItem value="^[0-9]{6}$">PIN Code (6 digits)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Value Range</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Minimum Value</Label>
+                          <Input
+                            type="number"
+                            step={!getColumnDataType().includes('int') ? "any" : "1"}
+                            value={validationRule?.min_value ?? ""}
+                            onChange={(e) =>
+                              setValidationRule({
+                                ...validationRule,
+                                min_value: e.target.value === "" ? undefined : 
+                                  !getColumnDataType().includes('int') 
+                                    ? parseFloat(e.target.value) 
+                                    : parseInt(e.target.value)
+                              })
+                            }
+                            placeholder="Enter minimum value"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Maximum Value</Label>
+                          <Input
+                            type="number"
+                            step={!getColumnDataType().includes('int') ? "any" : "1"}
+                            value={validationRule?.max_value ?? ""}
+                            onChange={(e) =>
+                              setValidationRule({
+                                ...validationRule,
+                                max_value: e.target.value === "" ? undefined :
+                                  !getColumnDataType().includes('int')
+                                    ? parseFloat(e.target.value)
+                                    : parseInt(e.target.value)
+                              })
+                            }
+                            placeholder="Enter maximum value"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Set the allowed value range (leave empty for no restrictions)
+                      </p>
                     </div>
                     
-                    {/* Sign Restrictions */}
-                    <div className="space-y-2">
-                      <Label>Sign Restriction</Label>
-                      <Select
-                        value={validationRule.number_sign || "none"}
-                        onValueChange={(value) =>
-                          setValidationRule({
-                            ...validationRule,
-                            number_sign: value as 'positive' | 'negative' | 'non_negative' | 'non_positive',
-                          })
-                        }
-                      >
-                        <SelectTrigger className="bg-white">
-                          <SelectValue placeholder="Select sign restriction" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          <SelectItem value="none">No restriction</SelectItem>
-                          <SelectItem value="positive">Positive only</SelectItem>
-                          <SelectItem value="negative">Negative only</SelectItem>
-                          <SelectItem value="non_negative">Non-negative (≥ 0)</SelectItem>
-                          <SelectItem value="non_positive">Non-positive (≤ 0)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Predefined Patterns - Only for numeric/integer fields */}
+                    {(getColumnDataType().includes('int') || getColumnDataType().includes('numeric')) && (
+                      <div className="space-y-2">
+                        <Label>Predefined Pattern</Label>
+                        <Select
+                          value={validationRule.regex_pattern || "none"}
+                          onValueChange={(value) =>
+                            setValidationRule({
+                              ...validationRule,
+                              regex_pattern: value === "none" ? "" : value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select pattern" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="none">No pattern</SelectItem>
+                            <SelectItem value="^[0-9]{10}$">Phone Number (10 digits)</SelectItem>
+                            <SelectItem value="^[0-9]{6}$">PIN Code (6 digits)</SelectItem>
+                            {!getColumnDataType().includes('int') && (
+                              <SelectItem value="^-?\d*\.?\d+$">Decimal Number</SelectItem>
+                            )}
+                            <SelectItem value="^-?\d+$">Integer Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    
+                    {/* Sign Restrictions - Only for numeric/integer fields */}
+                    {(getColumnDataType().includes('int') || getColumnDataType().includes('numeric')) && (
+                      <div className="space-y-2">
+                        <Label>Sign Restriction</Label>
+                        <Select
+                          value={validationRule.number_sign || "none"}
+                          onValueChange={(value) =>
+                            setValidationRule({
+                              ...validationRule,
+                              number_sign: value as 'positive' | 'negative' | 'non_negative' | 'non_positive',
+                            })
+                          }
+                        >
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select sign restriction" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="none">No restriction</SelectItem>
+                            <SelectItem value="positive">Positive only</SelectItem>
+                            <SelectItem value="negative">Negative only</SelectItem>
+                            <SelectItem value="non_negative">Non-negative (≥ 0)</SelectItem>
+                            <SelectItem value="non_positive">Non-positive (≤ 0)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
-                    {/* Parity Check */}
-                    <div className="space-y-2">
-                      <Label>Parity Check</Label>
-                      <Select
-                        value={validationRule.parity || "none"}
-                        onValueChange={(value) =>
-                          setValidationRule({
-                            ...validationRule,
-                            parity: value as 'even' | 'odd',
-                          })
-                        }
-                      >
-                        <SelectTrigger className="bg-white">
-                          <SelectValue placeholder="Select parity restriction" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          <SelectItem value="none">No restriction</SelectItem>
-                          <SelectItem value="even">Even numbers only</SelectItem>
-                          <SelectItem value="odd">Odd numbers only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Parity Check - Only show for integer fields */}
+                    {getColumnDataType().includes('int') && (
+                      <div className="space-y-2">
+                        <Label>Parity Check</Label>
+                        <Select
+                          value={validationRule.parity || "none"}
+                          onValueChange={(value) =>
+                            setValidationRule({
+                              ...validationRule,
+                              parity: value as 'even' | 'odd',
+                            })
+                          }
+                        >
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select parity restriction" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="none">No restriction</SelectItem>
+                            <SelectItem value="even">Even numbers only</SelectItem>
+                            <SelectItem value="odd">Odd numbers only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                ) : null}
+                )}
 
                 {/* Text Validations */}
-                {getColumnDataType().includes('character varying') || getColumnDataType().includes('text') ? (
+                {(getColumnDataType().includes('character varying') || getColumnDataType().includes('text')) && (
                   <div className="space-y-4 border-t pt-4">
                     <h3 className="font-medium">Text Validations</h3>
                     
@@ -622,7 +743,7 @@ const ValidationConfigurator: React.FC = () => {
                       </Select>
                     </div>
                   </div>
-                ) : null}
+                )}
 
                 {/* Custom Error Message */}
                 <div className="space-y-2">

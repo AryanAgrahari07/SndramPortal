@@ -36,9 +36,11 @@ interface ValidationRule {
   allow_weekends?: boolean;
   number_sign?: 'positive' | 'negative' | 'non_negative' | 'non_positive';
   parity?: 'even' | 'odd';
-  date_restriction?: 'past' | 'future' | 'custom';
+  date_restriction?: 'past' | 'future' | 'today' | 'custom';
   days_from_today?: number;
   case_restriction?: 'uppercase' | 'lowercase';
+  days_in_past?: number;
+  days_in_future?: number;
 }
 
 interface ValidationRules {
@@ -384,6 +386,44 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
         break;
       }
 
+      case "character varying":
+      case "text": {
+        // Only apply numeric validations if they are explicitly configured
+        if (validationRule) {
+          const hasNumericValidations = 
+            typeof validationRule.decimal_places === 'number' ||
+            typeof validationRule.min_value === 'number' ||
+            typeof validationRule.max_value === 'number';
+
+          if (hasNumericValidations) {
+            const numValue = Number(stringValue);
+            if (isNaN(numValue)) {
+              return "Must be a valid number";
+            }
+
+            if ( validationRule.min_value !== null && validationRule.min_value !== undefined) {
+              if (numValue < validationRule.min_value) {
+                return `Value must be greater than or equal to ${validationRule.min_value}`;
+              }
+            }
+
+            if ( validationRule.max_value !== null && validationRule.max_value !== undefined) {
+              if (numValue > validationRule.max_value) {
+                return `Value must be less than or equal to ${validationRule.max_value}`;
+              }
+            }
+
+            if (typeof validationRule.decimal_places === 'number') {
+              const decimalParts = stringValue.split('.');
+              if (decimalParts[1] && decimalParts[1].length > validationRule.decimal_places) {
+                return `Maximum ${validationRule.decimal_places} decimal places allowed`;
+              }
+            }
+          }
+        }
+        break;
+      }
+
       case "date":
       case "timestamp":
       case "timestamp without time zone":
@@ -398,57 +438,89 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
           if (validationRule.date_restriction) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            const inputDate = new Date(dateValue);
+            inputDate.setHours(0, 0, 0, 0);
 
             switch (validationRule.date_restriction) {
-                case 'past':
-                  if (dateValue >= today) {
-                    return "Date must be in the past";
-                  }
-                  break;
-                case 'future':
-                  if (dateValue <= today) {
-                    return "Date must be in the future";
-                  }
-                  break;
-                case 'custom':
-                  if (validationRule.days_from_today) {
-                    const limitDate = new Date(today);
-                    limitDate.setHours(0, 0, 0, 0);
-                    const inputDate = new Date(dateValue);
-                    inputDate.setHours(0, 0, 0, 0);
+              case 'past':
+                if (inputDate > today) {
+                  return "Date must be in the past or today";
+                }
+                break;
 
-                    if (validationRule.days_from_today > 0) {
-                      // Future date validation
-                      limitDate.setDate(today.getDate() + validationRule.days_from_today);
-                      if (inputDate > limitDate) {
-                        return `Date cannot be more than ${validationRule.days_from_today} days in the future`;
-                      }
-                    } else {
-                      // Past date validation
-                      // For negative days_from_today, calculate the earliest allowed date
-                      limitDate.setDate(today.getDate() + validationRule.days_from_today);
-                      if (inputDate < limitDate) {
-                        return `Date must be within the last ${Math.abs(validationRule.days_from_today)} days`;
-                      }
-                      if (inputDate > today) {
-                        return `Date must be in the past`;
-                      }
+              case 'future':
+                if (inputDate < today) {
+                  return "Date must be in the future or today";
+                }
+                break;
+
+              case 'today':
+                if (inputDate.getTime() !== today.getTime()) {
+                  return "Date must be today";
+                }
+                break;
+
+              case 'custom': {
+                const pastLimit = validationRule.days_in_past;
+                const futureLimit = validationRule.days_in_future;
+
+                // Skip validation if both limits are null/undefined
+                if (pastLimit === null || pastLimit === undefined) {
+                  if (futureLimit === null || futureLimit === undefined) {
+                    break; // No restrictions if both are null/undefined
+                  }
+                }
+
+                // Handle past limit
+                if (pastLimit !== null && pastLimit !== undefined) {
+                  if (pastLimit === 0) {
+                    // Block all past dates
+                    if (inputDate < today) {
+                      return "Past dates are not allowed";
+                    }
+                  } else {
+                    // Check past limit
+                    const pastDate = new Date(today);
+                    pastDate.setDate(today.getDate() - pastLimit);
+                    pastDate.setHours(0, 0, 0, 0);
+                    if (inputDate < pastDate) {
+                      return `Date must not be more than ${pastLimit} days in the past`;
                     }
                   }
-                  break;
-            }
-          }
+                }
 
-          if (validationRule.min_date && dateValue < new Date(validationRule.min_date)) {
-            return `Date must be after ${new Date(validationRule.min_date).toLocaleDateString()}`;
-          }
-          if (validationRule.max_date && dateValue > new Date(validationRule.max_date)) {
-            return `Date must be before ${new Date(validationRule.max_date).toLocaleDateString()}`;
-          }
-          if (validationRule.allow_weekends === false) {
-            const day = dateValue.getDay();
-            if (day === 0 || day === 6) {
-              return "Weekend dates are not allowed";
+                // Handle future limit
+                if (futureLimit !== null && futureLimit !== undefined) {
+                  if (futureLimit === 0) {
+                    // Block all future dates
+                    if (inputDate > today) {
+                      return "Future dates are not allowed";
+                    }
+                  } else {
+                    // Check future limit
+                    const futureDate = new Date(today);
+                    futureDate.setDate(today.getDate() + futureLimit);
+                    futureDate.setHours(0, 0, 0, 0);
+                    if (inputDate > futureDate) {
+                      return `Date must not be more than ${futureLimit} days in the future`;
+                    }
+                  }
+                }
+                break;
+              }
+            }
+
+            if (validationRule.min_date && dateValue < new Date(validationRule.min_date)) {
+              return `Date must be after ${new Date(validationRule.min_date).toLocaleDateString()}`;
+            }
+            if (validationRule.max_date && dateValue > new Date(validationRule.max_date)) {
+              return `Date must be before ${new Date(validationRule.max_date).toLocaleDateString()}`;
+            }
+            if (validationRule.allow_weekends === false) {
+              const day = dateValue.getDay();
+              if (day === 0 || day === 6) {
+                return "Weekend dates are not allowed";
+              }
             }
           }
         }

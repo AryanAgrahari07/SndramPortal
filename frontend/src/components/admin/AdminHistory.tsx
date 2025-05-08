@@ -250,7 +250,20 @@ export const AdminHistory = () => {
       [type]: value,
     }));
     setDateFilter("custom");
+    // Reset to first page when date filter changes
+    setCurrentPage(1);
+    setFilterParams(prev => ({
+      ...prev,
+      currentPage: 1
+    }));
   };
+
+  // Add useEffect to trigger search when date range changes
+  useEffect(() => {
+    if (dateFilter === "custom" && (customDateRange.from || customDateRange.to)) {
+      loadRequests();
+    }
+  }, [customDateRange, dateFilter]);
 
   const renderChanges = (request: HistoryRecord) => {
     if (request.type === "change" && request.old_data && request.new_data) {
@@ -289,6 +302,10 @@ export const AdminHistory = () => {
     setDateFilter("all");
     setCustomDateRange({ from: "", to: "" });
     setCurrentPage(1);
+    setFilterParams(prev => ({
+      ...prev,
+      currentPage: 1
+    }));
     loadRequests();
     setSearchText("");
   };
@@ -302,6 +319,14 @@ export const AdminHistory = () => {
     setCurrentPage(1);
     setRequests([]);
     loadRequests();
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    setFilterParams(prev => ({
+      ...prev,
+      currentPage: page
+    }));
   };
 
   if (isLoading) {
@@ -380,6 +405,7 @@ export const AdminHistory = () => {
             onChange={(e) => handleDateChange("to", e.target.value)}
             className="w-[150px]"
             min={customDateRange.from || undefined}
+            max={new Date().toISOString().split('T')[0]}
           />
         </div>
 
@@ -600,7 +626,16 @@ export const AdminHistory = () => {
                     </div>
                   </TableCell>
                   <TableCell>{request.maker_email}</TableCell>
-                  <TableCell>{request.checker_email}</TableCell>
+                  <TableCell>
+                    {request.type === "add" ? (
+                      <div className="flex items-center gap-1">
+                        <span>{request.checker_email}</span>
+                        <span className="text-xs text-gray-500">(Admin)</span>
+                      </div>
+                    ) : (
+                      request.checker_email
+                    )}
+                  </TableCell>
                   <TableCell>
                     {format(new Date(request.created_at), "dd MMM yyyy HH:mm")}
                   </TableCell>
@@ -632,8 +667,13 @@ export const AdminHistory = () => {
               <select
                 value={itemsPerPage}
                 onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
+                  const newItemsPerPage = Number(e.target.value);
+                  setItemsPerPage(newItemsPerPage);
                   setCurrentPage(1);
+                  setFilterParams(prev => ({
+                    ...prev,
+                    currentPage: 1
+                  }));
                 }}
                 className="h-8 px-2 rounded-lg border border-[#e3f2fd] text-sm text-[#1a237e] focus:outline-none focus:border-[#00bfa5]"
               >
@@ -653,7 +693,7 @@ export const AdminHistory = () => {
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                onPageChange={setCurrentPage}
+                onPageChange={handlePageChange}
               />
             </div>
           </div>
