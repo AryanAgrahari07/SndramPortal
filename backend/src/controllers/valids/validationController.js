@@ -282,3 +282,83 @@ exports.toggleValidationRule = async (req, res) => {
     });
   }
 };
+
+// Validate dropdown value against column validation rules
+exports.validateDropdownValue = async (req, res) => {
+  try {
+    const { tableName, columnName, value } = req.body;
+
+    if (!tableName || !columnName || value === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: tableName, columnName, value'
+      });
+    }
+
+    // Get column data type
+    const typeQuery = `
+      SELECT data_type 
+      FROM information_schema.columns 
+      WHERE table_schema = 'app' 
+        AND table_name = $1 
+        AND column_name = $2
+    `;
+    const typeResult = await client_update.query(typeQuery, [tableName, columnName]);
+    
+    if (typeResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Column ${columnName} not found in table ${tableName}`
+      });
+    }
+    
+    const dataType = typeResult.rows[0]?.data_type;
+
+    // Get validation rule
+    const validationQuery = `
+      SELECT *
+      FROM app.column_validations
+      WHERE table_name = $1
+        AND column_name = $2
+        AND is_active = true;
+    `;
+    const validationResult = await client_update.query(validationQuery, [tableName, columnName]);
+    const validationRule = validationResult.rows[0];
+
+    // Import the validation function
+    const validateField = require('../../middleware/dataValidation').validateField;
+    if (!validateField) {
+      // If function is not directly accessible, recreate the validation logic here
+      const { validateField: importedValidateField } = require('../../middleware/dataValidation');
+      
+      if (!importedValidateField) {
+        throw new Error('validateField function not available');
+      }
+      
+      const error = await importedValidateField(columnName, value, dataType, validationRule);
+      
+      return res.json({
+        success: true,
+        isValid: !error,
+        error: error
+      });
+    }
+    
+    // Validate the value
+    const error = await validateField(columnName, value, dataType, validationRule);
+    
+    return res.json({
+      success: true,
+      isValid: !error,
+      error: error
+    });
+    
+  } catch (error) {
+    console.error('Error validating dropdown value:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to validate dropdown value',
+      error: error.message
+    });
+  }
+};

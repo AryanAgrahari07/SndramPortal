@@ -105,12 +105,13 @@ const { getRenamed } = require("../controllers/fetchrenamed/fetchrenamed.js");
 const { getDropdownConfig, getFilteredOptions, updateDropdownConfig, bulkUploadDropdownOptions } = require("../controllers/dropdown/dependentdropdown.js");
 // Import validation controller
 const {
+  getTableValidationRules,
   getValidationRule,
   upsertValidationRule,
   deleteValidationRule,
   toggleValidationRule,
-  getTableValidationRules
-} = require("../controllers/valids/validationController.js");
+  validateDropdownValue
+} = require("../controllers/valids/validationController");
 const { fetchColumnwithdatatype } = require("../controllers/fetchColumn/fetchcolwithdatatype.js");
 const { 
   getAdminLogs, 
@@ -316,6 +317,14 @@ router.patch(
   logAdminAction("UPDATE", "VALIDATION_CONFIG"),
   toggleValidationRule
 );
+
+// Dropdown value validation route
+router.post(
+  "/api/validations/dropdown-value",
+  verifyToken,
+  validateDropdownValue
+);
+
 module.exports = router;
 
 // POST /highlight-cells - Manages cell highlighting in tables for makers// GET /maker-notification - Gets notifications for maker role

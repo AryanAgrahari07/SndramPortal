@@ -1,5 +1,6 @@
 const { client_update } = require('../../configuration/database/databaseUpdate.js');
 const { v4: uuidv4 } = require('uuid');
+const { validateField } = require('../../middleware/dataValidation.js');
 
 /**
  * Get dropdown configuration for a table
@@ -189,28 +190,85 @@ exports.updateDropdownConfig = async (req, res) => {
                 });
             }
             
-            // If it's a dependent dropdown, verify parent column exists
-            // if (option.parentColumn) {
-            //     const parentColumnExists = dropdown_options.some(opt => opt.columnName === option.parentColumn);
-                // if (!parentColumnExists) {
-                //     return res.status(400).json({
-                //         success: false,
-                //         message: `Parent column ${option.parentColumn} for ${option.columnName} not found in configuration`
-                //     });
-                // }
-                
-                // Validate parent references in options
-                // if (Array.isArray(option.options)) {
-                //     for (const opt of option.options) {
-                //         if (typeof opt === 'object' && !opt.parent) {
-                //             return res.status(400).json({
-                //                 success: false,
-                //                 message: `Options for dependent column ${option.columnName} must have parent property`
-                //             });
-                //         }
-                //     }
-                // }
-            // }
+            // Get column data type for validation
+            const typeQuery = `
+                SELECT data_type 
+                FROM information_schema.columns 
+                WHERE table_schema = 'app' 
+                AND table_name = $1 
+                AND column_name = $2;
+            `;
+            const typeResult = await client_update.query(typeQuery, [tableName, option.columnName]);
+            
+            if (typeResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Column ${option.columnName} not found in table ${tableName}`
+                });
+            }
+            
+            const dataType = typeResult.rows[0].data_type;
+            
+            // Get validation rule if it exists
+            const validationQuery = `
+                SELECT *
+                FROM app.column_validations
+                WHERE table_name = $1
+                AND column_name = $2
+                AND is_active = true;
+            `;
+            const validationResult = await client_update.query(validationQuery, [tableName, option.columnName]);
+            const validationRule = validationResult.rows[0];
+            
+            // Validate every option if it's a simple string array
+            if (Array.isArray(option.options) && typeof option.options[0] === 'string') {
+                for (let i = 0; i < option.options.length; i++) {
+                    const value = option.options[i];
+                    
+                    // Validate the value against validation rules
+                    const error = await validateField(
+                        option.columnName,
+                        value,
+                        dataType,
+                        validationRule
+                    );
+                    
+                    if (error) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Validation error for option "${value}" in column ${option.columnName}: ${error}`
+                        });
+                    }
+                }
+            }
+            // Validate each option.value if it's an array of objects
+            else if (Array.isArray(option.options) && typeof option.options[0] === 'object') {
+                for (let i = 0; i < option.options.length; i++) {
+                    const optObj = option.options[i];
+                    
+                    if (!optObj.value) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Option at index ${i} in column ${option.columnName} is missing 'value' property`
+                        });
+                    }
+                    
+                    // Validate the value against validation rules
+                    const error = await validateField(
+                        option.columnName,
+                        optObj.value,
+                        dataType,
+                        validationRule
+                    );
+                    
+                    if (error) {
+                        return res.status(400).json({
+                            success: false,
+                            message: `Validation error for option "${optObj.value}" in column ${option.columnName}: ${error}`
+                        });
+                    }
+                }
+            }
         }
         
         // Check if configuration already exists
@@ -290,12 +348,12 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
     const { tableName } = req.params;
     const { columnName, parentColumn, options } = req.body;
     
-    console.log("Received bulk upload request:", {
-        tableName,
-        columnName,
-        parentColumn,
-        optionsCount: options?.length || 0
-    });
+    // console.log("Received bulk upload request:", {
+    //     tableName,
+    //     columnName,
+    //     parentColumn,
+    //     optionsCount: options?.length || 0
+    // });
     
     if (!columnName || !parentColumn) {
         return res.status(400).json({
@@ -312,6 +370,36 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
     }
     
     try {
+        // Get column data type for validation
+        const typeQuery = `
+            SELECT data_type 
+            FROM information_schema.columns 
+            WHERE table_schema = 'app' 
+            AND table_name = $1 
+            AND column_name = $2;
+        `;
+        const typeResult = await client_update.query(typeQuery, [tableName, columnName]);
+        
+        if (typeResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `Column ${columnName} not found in table ${tableName}`
+            });
+        }
+        
+        const dataType = typeResult.rows[0].data_type;
+        
+        // Get validation rule if it exists
+        const validationQuery = `
+            SELECT *
+            FROM app.column_validations
+            WHERE table_name = $1
+            AND column_name = $2
+            AND is_active = true;
+        `;
+        const validationResult = await client_update.query(validationQuery, [tableName, columnName]);
+        const validationRule = validationResult.rows[0];
+        
         // Get existing configuration
         const query = `
             SELECT row_id, dropdown_options 
@@ -323,17 +411,46 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
         const now = new Date();
         
         // Validate each option - reject rows where either field is missing
-        const validOptions = options.filter(opt => 
-            opt.parent_value && opt.parent_value.trim() && 
-            opt.option_value && opt.option_value.trim()
-        );
+        const validOptions = [];
+        const invalidOptions = [];
         
-        console.log("Valid options count:", validOptions.length);
+        for (const opt of options) {
+            if (!opt.parent_value || !opt.parent_value.trim() || 
+                !opt.option_value || !opt.option_value.trim()) {
+                invalidOptions.push({
+                    option: opt,
+                    reason: "Missing parent_value or option_value"
+                });
+                continue;
+            }
+            
+            // Validate the option_value against validation rules
+            const error = await validateField(
+                columnName,
+                opt.option_value.trim(),
+                dataType,
+                validationRule
+            );
+            
+            if (error) {
+                invalidOptions.push({
+                    option: opt,
+                    reason: error
+                });
+                continue;
+            }
+            
+            validOptions.push(opt);
+        }
+        
+        // console.log("Valid options count:", validOptions.length);
+        // console.log("Invalid options count:", invalidOptions.length);
         
         if (validOptions.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "No valid options provided - both parent_value and option_value are required for each row"
+                message: "No valid options provided after validation",
+                invalidOptions: invalidOptions
             });
         }
         
@@ -360,7 +477,7 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
                         typeof opt === 'string' ? opt.toLowerCase() : opt.value.toLowerCase()
                     );
                     
-                    console.log(`Found ${parentColumnValues.length} parent values for validation`);
+                    // console.log(`Found ${parentColumnValues.length} parent values for validation`);
                 }
             }
         } catch (error) {

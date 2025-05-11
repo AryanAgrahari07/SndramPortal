@@ -90,6 +90,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   const [csvErrors, setCSVErrors] = useState<CSVValidationError[]>([]);
   const [showErrors, setShowErrors] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTables();
@@ -357,7 +358,48 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     }
   };
 
-  const handleAddOption = () => {
+  // Add new function to validate dropdown value
+  const validateDropdownValue = async (value: string): Promise<{ isValid: boolean; error?: string }> => {
+    if (!selectedTable || !selectedColumn) {
+      return { isValid: true }; // Skip validation if table/column not selected
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8080/api/validations/dropdown-value", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tableName: selectedTable,
+          columnName: selectedColumn,
+          value: value
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || "Validation request failed");
+      }
+
+      return {
+        isValid: data.isValid,
+        error: data.error
+      };
+    } catch (error) {
+      console.error("Validation error:", error);
+      return {
+        isValid: false,
+        error: error instanceof Error ? error.message : "Failed to validate option"
+      };
+    }
+  };
+
+  const handleAddOption = async () => {
     const trimmedOption = newOption.trim();
   
     // Check if option is empty
@@ -370,13 +412,24 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       return;
     }
   
-    // Validate option format using regex
+    // First perform the basic format validation
     const validFormat = /^[A-Za-z\s_-]+$/;
     if (!validFormat.test(trimmedOption)) {
       toast({
         title: "Error",
         description:
           "Option can only contain letters, spaces, underscores, and hyphens",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Now validate against any configured validation rules
+    const validation = await validateDropdownValue(trimmedOption);
+    if (!validation.isValid) {
+      toast({
+        title: "Validation Error",
+        description: validation.error || "The value does not meet validation requirements",
         variant: "destructive",
       });
       return;
@@ -761,7 +814,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   };
 
   // FIX: Also update the handleAddSharedOption function to ensure shared options are properly marked
-  const handleAddSharedOption = () => {
+  const handleAddSharedOption = async () => {
     const trimmedOption = newOption.trim();
     // Check if option is empty
     if (!trimmedOption) {
@@ -783,6 +836,18 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       });
       return;
     }
+
+    // Validate against column-specific validation rules
+    const validation = await validateDropdownValue(trimmedOption);
+    if (!validation.isValid) {
+      toast({
+        title: "Validation Error",
+        description: validation.error || "The value does not meet validation requirements",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check for duplicates among all options - both shared and parent-specific
     const sharedOptionExists = options.some(
       (opt) =>
@@ -936,7 +1001,9 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       const validationErrors: CSVValidationError[] = [];
       const validRows: Array<{parent_value: string, option_value: string}> = [];
       
-      results.data.forEach((row, index) => {
+      // Process each row sequentially with validation
+      for (let index = 0; index < results.data.length; index++) {
+        const row = results.data[index];
         const rowNum = index + 2; // +2 because row 1 is headers
         let rowValid = true;
         
@@ -972,6 +1039,19 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             message: "Option value cannot be empty",
           });
           rowValid = false;
+        } else {
+          // Validate option_value against validation rules
+          const sanitizedValue = sanitizeInput(String(row.option_value).trim());
+          const validation = await validateDropdownValue(sanitizedValue);
+          
+          if (!validation.isValid) {
+            validationErrors.push({
+              row: rowNum,
+              column: "option_value",
+              message: validation.error || "Value does not meet validation requirements",
+            });
+            rowValid = false;
+          }
         }
         
         // If row is valid, add to valid rows array
@@ -981,12 +1061,15 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             option_value: sanitizeInput(String(row.option_value).trim())
           });
         }
-      });
+      }
 
       if (validationErrors.length > 0) {
         setCSVErrors(validationErrors);
         if (validRows.length === 0) {
           setIsUploading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
           return; // Stop here if there are no valid rows
         }
         
@@ -1006,6 +1089,9 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
           variant: "destructive",
         });
         setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         return;
       }
 
@@ -1035,13 +1121,13 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       // Prepare data for API, removing duplicates
       const uniqueValidRows = Array.from(uniqueOptions.values());
       
-      console.log("CSV data to be sent to API:", {
-        tableName: selectedTable,
-        columnName: selectedColumn,
-        parentColumn: parentColumn,
-        options: uniqueValidRows,
-        sample: uniqueValidRows.length > 0 ? uniqueValidRows[0] : null
-      });
+      // console.log("CSV data to be sent to API:", {
+      //   tableName: selectedTable,
+      //   columnName: selectedColumn,
+      //   parentColumn: parentColumn,
+      //   options: uniqueValidRows,
+      //   sample: uniqueValidRows.length > 0 ? uniqueValidRows[0] : null
+      // });
       
       // Send data to the API endpoint
       const token = localStorage.getItem("token");
@@ -1062,22 +1148,105 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         }
       );
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API error response:", errorData);
-        throw new Error(errorData.message || "Failed to upload options");
-      }
-      
       const data = await response.json();
-      console.log("API success response:", data);
+      // console.log("API response:", data);
       
-      toast({
-        title: "Success",
-        description: data.message || `Processed ${uniqueValidRows.length} options from CSV`,
-      });
+      // Process API response to extract validation errors, regardless of success status
+      const processBackendValidationErrors = () => {
+        // Handle invalidOptions format from the backend
+        if (data.invalidOptions && Array.isArray(data.invalidOptions)) {
+          const backendErrors = data.invalidOptions.map((invalidOption: any, _: number) => {
+            const option = invalidOption.option || {};
+            return {
+              row: 0, // We don't know the exact row
+              column: option.option_value ? 'option_value' : option.parent_value ? 'parent_value' : 'unknown',
+              message: `${option.parent_value || ''} → ${option.option_value || ''}: ${invalidOption.reason || 'Invalid option'}`
+            };
+          });
+          
+          // Add these errors to our existing errors and ensure they're displayed
+          setCSVErrors(prev => [...prev, ...backendErrors]);
+          setShowErrors(true);
+          
+          // Show toast for invalid options if no success message is shown
+          if (!data.success && backendErrors.length > 0) {
+            toast({
+              title: "Validation Errors",
+              description: `${backendErrors.length} option(s) failed validation`,
+              variant: "destructive",
+            });
+          }
+        }
+        
+        // Handle validationErrors format from the backend
+        if (data.validationErrors && Array.isArray(data.validationErrors)) {
+          const backendErrors = data.validationErrors.map((error: any, index: number) => ({
+            row: index + 1, // We don't know the exact row
+            column: error.column || "option_value",
+            message: error.message || "Validation error"
+          }));
+          
+          // Add these errors to our existing errors
+          setCSVErrors(prev => [...prev, ...backendErrors]);
+          setShowErrors(true);
+        }
+        
+        // Handle single error message with regex parsing
+        if (data.message && typeof data.message === 'string' && !data.success) {
+          // Look for validation error patterns in the message
+          const errorMatch = data.message.match(/Validation error for option \"(.+?)\" in column (.+?):/);
+          if (errorMatch) {
+            const [, _, column] = errorMatch;
+            
+            setCSVErrors(prev => [...prev, {
+              row: 0, // We don't know the row number
+              column: column || "option_value",
+              message: data.message
+            }]);
+            setShowErrors(true);
+          }
+        }
+      };
       
-      // Refresh data to show updated options
-      await fetchExistingOptions();
+      // Process validation errors regardless of whether the request was successful or not
+      processBackendValidationErrors();
+      
+      if (!response.ok) {
+        console.error("API error response:", data);
+        throw new Error(data.message || "Failed to upload options");
+      } else {
+        // Even for successful responses, we want to show validation errors if any
+        if (data.success) {
+          // Format a success message based on the response
+          let successMessage = data.message || "Options processed successfully";
+          
+          // If we have specific counts in the response, add them to the message
+          if (data.added !== undefined || data.skipped !== undefined || data.rejected !== undefined) {
+            const added = data.added !== undefined ? `${data.added} added` : '';
+            const skipped = data.skipped !== undefined ? `${data.skipped} skipped` : '';
+            const rejected = data.rejected !== undefined ? `${data.rejected} rejected` : '';
+            const shared = data.shared !== undefined ? `${data.shared} shared` : '';
+            
+            const counts = [added, skipped, rejected, shared].filter(Boolean).join(', ');
+            successMessage = counts ? `${successMessage} (${counts})` : successMessage;
+          }
+          
+          toast({
+            title: "Success",
+            description: successMessage,
+          });
+        } else {
+          // If success is false but the API returned a 200, still treat it as a warning
+          toast({
+            title: "Warning",
+            description: data.message || "Some options could not be processed",
+            variant: "destructive",
+          });
+        }
+        
+        // Refresh data to show updated options
+        await fetchExistingOptions();
+      }
       
     } catch (error) {
       console.error("CSV upload error:", error);
@@ -1086,6 +1255,30 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         description: error instanceof Error ? error.message : "Failed to process CSV file",
         variant: "destructive",
       });
+      
+      // Add backend error message to CSV errors if it's not already there
+      if (error instanceof Error && error.message) {
+        // Check if this is a validation error message
+        const errorMatch = error.message.match(/Validation error for option \"(.+?)\" in column (.+?):/);
+        if (errorMatch) {
+          const [, value, column] = errorMatch;
+          
+          // Add to CSV errors if not already present
+          const errorExists = csvErrors.some(err => 
+            err.message.includes(error.message) || 
+            err.message.includes(value)
+          );
+          
+          if (!errorExists) {
+            setCSVErrors(prev => [...prev, {
+              row: 0, // We don't know the exact row
+              column: column || "option_value",
+              message: error.message
+            }]);
+            setShowErrors(true);
+          }
+        }
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -1692,8 +1885,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
 };
 
 // Add styles for custom scrollbar at the end of the file
-const scrollbarStyles = `
-  .custom-scrollbar::-webkit-scrollbar {
+const scrollbarStyles = `  .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -1717,3 +1909,4 @@ if (typeof document !== "undefined") {
 }
 
 export default DropdownManager;
+

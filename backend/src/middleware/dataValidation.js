@@ -463,3 +463,4 @@ const validateData = async (req, res, next) => {
 };
 
 module.exports = validateData;
+module.exports.validateField = validateField;
