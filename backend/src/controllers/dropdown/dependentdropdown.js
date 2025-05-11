@@ -272,3 +272,325 @@ exports.updateDropdownConfig = async (req, res) => {
         });
     }
 };
+
+/**
+ * Bulk upload dropdown options from CSV
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.bulkUploadDropdownOptions = async (req, res) => {
+    // Verify admin role (should be handled by middleware already)
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: "Only admin users can update dropdown configurations"
+        });
+    }
+    
+    const { tableName } = req.params;
+    const { columnName, parentColumn, options } = req.body;
+    
+    console.log("Received bulk upload request:", {
+        tableName,
+        columnName,
+        parentColumn,
+        optionsCount: options?.length || 0
+    });
+    
+    if (!columnName || !parentColumn) {
+        return res.status(400).json({
+            success: false,
+            message: "columnName and parentColumn are required"
+        });
+    }
+    
+    if (!Array.isArray(options)) {
+        return res.status(400).json({
+            success: false,
+            message: "options must be an array of {parent_value, option_value} objects"
+        });
+    }
+    
+    try {
+        // Get existing configuration
+        const query = `
+            SELECT row_id, dropdown_options 
+            FROM app.dynamic_dropdowns 
+            WHERE table_name = $1;
+        `;
+        
+        const result = await client_update.query(query, [tableName]);
+        const now = new Date();
+        
+        // Validate each option - reject rows where either field is missing
+        const validOptions = options.filter(opt => 
+            opt.parent_value && opt.parent_value.trim() && 
+            opt.option_value && opt.option_value.trim()
+        );
+        
+        console.log("Valid options count:", validOptions.length);
+        
+        if (validOptions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No valid options provided - both parent_value and option_value are required for each row"
+            });
+        }
+        
+        // Get all existing parent column values to validate against
+        let parentColumnValues = [];
+        try {
+            // First check if we have parent dropdown values defined
+            const parentValuesQuery = `
+                SELECT dropdown_options 
+                FROM app.dynamic_dropdowns 
+                WHERE table_name = $1;
+            `;
+            
+            const parentValuesResult = await client_update.query(parentValuesQuery, [tableName]);
+            
+            if (parentValuesResult.rows.length > 0) {
+                const dropdownOptions = parentValuesResult.rows[0].dropdown_options || [];
+                // Find the parent column configuration
+                const parentColumnConfig = dropdownOptions.find(opt => opt.columnName === parentColumn);
+                
+                if (parentColumnConfig && Array.isArray(parentColumnConfig.options)) {
+                    // Extract parent values
+                    parentColumnValues = parentColumnConfig.options.map(opt => 
+                        typeof opt === 'string' ? opt.toLowerCase() : opt.value.toLowerCase()
+                    );
+                    
+                    console.log(`Found ${parentColumnValues.length} parent values for validation`);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching parent column values:", error);
+            // Continue processing as we can still handle 'shared' values
+        }
+        
+        // Additional validation for parent values that aren't 'shared'
+        const invalidParentValues = [];
+        const finalValidOptions = validOptions.filter(opt => {
+            // Skip validation for 'shared' parent values
+            if (opt.parent_value.toLowerCase() === 'shared') {
+                return true;
+            }
+            
+            // Skip validation if we couldn't retrieve parent values
+            if (parentColumnValues.length === 0) {
+                return true;
+            }
+            
+            // Check if parent value exists
+            const parentExists = parentColumnValues.includes(opt.parent_value.toLowerCase());
+            if (!parentExists) {
+                invalidParentValues.push(opt.parent_value);
+                return false;
+            }
+            
+            return true;
+        });
+        
+        if (invalidParentValues.length > 0) {
+            console.log(`Rejected ${invalidParentValues.length} options with invalid parent values`);
+        }
+        
+        if (finalValidOptions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: invalidParentValues.length > 0 
+                    ? `All options have invalid parent values. Valid parent values are required.` 
+                    : "No valid options provided after validation"
+            });
+        }
+        
+        // Track statistics for response message
+        let addedCount = 0;
+        let skippedDuplicates = 0;
+        let sharedCount = 0;
+        
+        // Process the options from CSV
+        const processedOptions = [];
+        const sharedOptions = new Set(); // For keeping track of unique shared options
+        
+        // Get existing column options if any
+        let existingOptions = [];
+        let existingColumnOptions = [];
+        
+        if (result.rows.length > 0) {
+            existingOptions = result.rows[0].dropdown_options || [];
+            const existingColumnConfig = existingOptions.find(opt => opt.columnName === columnName);
+            
+            if (existingColumnConfig && Array.isArray(existingColumnConfig.options)) {
+                existingColumnOptions = existingColumnConfig.options;
+                
+                // Add existing options to processedOptions and track shared options
+                existingColumnOptions.forEach(opt => {
+                    // Add all existing options to our processed list
+                    processedOptions.push(opt);
+                    
+                    // Track existing shared options (with parent = null)
+                    if (opt.parent === null && opt.value) {
+                        sharedOptions.add(opt.value.toLowerCase());
+                    }
+                });
+            }
+        }
+        
+        // First, extract shared options (parent_value = "shared")
+        finalValidOptions.forEach(opt => {
+            if (opt.parent_value && opt.parent_value.toLowerCase() === 'shared') {
+                const optionValue = opt.option_value.trim();
+                
+                // Check if this shared option already exists (case insensitive)
+                if (!sharedOptions.has(optionValue.toLowerCase())) {
+                    sharedOptions.add(optionValue.toLowerCase());
+                    
+                    // Check if it doesn't already exist in processedOptions
+                    const exists = processedOptions.some(
+                        existing => existing.value && 
+                        existing.value.toLowerCase() === optionValue.toLowerCase() && 
+                        existing.parent === null
+                    );
+                    
+                    if (!exists) {
+                        processedOptions.push({
+                            value: optionValue,
+                            parent: null
+                        });
+                        sharedCount++;
+                        addedCount++;
+                    } else {
+                        skippedDuplicates++;
+                    }
+                } else {
+                    skippedDuplicates++;
+                }
+            }
+        });
+        
+        // Then process parent-specific options
+        finalValidOptions.forEach(opt => {
+            if (opt.parent_value && opt.option_value && 
+                opt.parent_value.toLowerCase() !== 'shared') {
+                
+                const parentValue = opt.parent_value.trim();
+                const optionValue = opt.option_value.trim();
+                
+                // Check if this is already added as a shared option
+                if (sharedOptions.has(optionValue.toLowerCase())) {
+                    skippedDuplicates++; // Skip if already a shared option
+                    return;
+                }
+                
+                // Check if this parent-specific option already exists
+                const exists = processedOptions.some(
+                    existing => existing.value && existing.parent &&
+                    existing.value.toLowerCase() === optionValue.toLowerCase() && 
+                    existing.parent.toLowerCase() === parentValue.toLowerCase()
+                );
+                
+                if (!exists) {
+                    processedOptions.push({
+                        value: optionValue,
+                        parent: parentValue
+                    });
+                    addedCount++;
+                } else {
+                    skippedDuplicates++;
+                }
+            }
+        });
+        
+        if (result.rows.length > 0) {
+            // Update existing configuration
+            const rowId = result.rows[0].row_id;
+            let allOptions = [...existingOptions]; // Copy existing options array
+            
+            // Find if this column already has configuration
+            const existingIndex = allOptions.findIndex(
+                item => item.columnName === columnName
+            );
+            
+            console.log("Existing configuration:", {
+                hasExistingConfig: existingIndex > -1,
+                existingColumnIndex: existingIndex,
+                processedOptionsCount: processedOptions.length
+            });
+            
+            if (existingIndex > -1) {
+                // Update existing column configuration
+                allOptions[existingIndex] = {
+                    ...allOptions[existingIndex],
+                    options: processedOptions, // Use merged options array
+                    parentColumn: parentColumn
+                };
+            } else {
+                // Column does not exist, add new column
+                allOptions.push({
+                    columnName: columnName,
+                    options: processedOptions,
+                    parentColumn: parentColumn
+                });
+            }
+            
+            // Update the table
+            const updateQuery = `
+                UPDATE app.dynamic_dropdowns 
+                SET dropdown_options = $1::jsonb, 
+                    updated_at = $2 
+                WHERE row_id = $3;
+            `;
+            
+            try {
+                await client_update.query(updateQuery, [
+                    JSON.stringify(allOptions),
+                    now,
+                    rowId
+                ]);
+                console.log("Successfully updated dropdown options in database");
+            } catch (dbError) {
+                console.error("Database update error:", dbError);
+                throw dbError;
+            }
+        } else {
+            // Insert new configuration
+            const rowId = uuidv4();
+            const newOptions = [{
+                columnName: columnName,
+                options: processedOptions,
+                parentColumn: parentColumn
+            }];
+            
+            const insertQuery = `
+                INSERT INTO app.dynamic_dropdowns 
+                (table_name, dropdown_options, created_at, updated_at, row_id) 
+                VALUES ($1, $2::jsonb, $3, $4, $5);
+            `;
+            
+            await client_update.query(insertQuery, [
+                tableName,
+                JSON.stringify(newOptions),
+                now,
+                now,
+                rowId
+            ]);
+        }
+        
+        return res.status(200).json({
+            success: true,
+            message: `Successfully processed options: ${addedCount} added, ${skippedDuplicates} skipped (duplicates)${invalidParentValues.length > 0 ? `, ${invalidParentValues.length} rejected (invalid parent values)` : ''}`,
+            added: addedCount,
+            skipped: skippedDuplicates,
+            rejected: invalidParentValues.length,
+            shared: sharedCount
+        });
+    } catch (error) {
+        console.error("Error bulk uploading dropdown options:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to bulk upload dropdown options",
+            error: error.message
+        });
+    }
+};

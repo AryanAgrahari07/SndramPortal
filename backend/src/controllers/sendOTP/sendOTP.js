@@ -125,7 +125,6 @@ exports.sendOTP = async (req, res) => {
         // Send OTP via email
         try {
             await sendOTPEmail(email, otp);
-            console.log(otp);
             await client_update.query('COMMIT');
         } catch (emailError) {
             await client_update.query('ROLLBACK');

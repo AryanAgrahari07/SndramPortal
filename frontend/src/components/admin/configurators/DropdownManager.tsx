@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -9,11 +9,14 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, X, Table, Database, List, Link2 } from "lucide-react";
+import { Plus, X, Table, Database, List, Link2, Upload, Download, AlertCircle } from "lucide-react";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
 import { Switch } from "@/components/ui/Switch";
 import { Label } from "@/components/ui/label";
+import Papa from "papaparse";
+import { sanitizeInput } from "@/utils/security";
+// import { API_URL } from "@/config/constants";
 
 interface DropdownOption {
   value: string;
@@ -54,6 +57,13 @@ interface ColumnMapping {
   renamed_column_name: string;
 }
 
+// Add new interface for CSV validation errors
+interface CSVValidationError {
+  row: number;
+  column: string;
+  message: string;
+}
+
 const DropdownManager: React.FC<DropdownManagerProps> = ({
   tables: initialTables,
 }) => {
@@ -74,6 +84,12 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   const [relationships, setRelationships] = useState<ParentChildRelationship[]>(
     []
   );
+  
+  // Add new states for CSV upload
+  const [isUploading, setIsUploading] = useState(false);
+  const [csvErrors, setCSVErrors] = useState<CSVValidationError[]>([]);
+  const [showErrors, setShowErrors] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchTables();
@@ -341,7 +357,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     }
   };
 
-
   const handleAddOption = () => {
     const trimmedOption = newOption.trim();
   
@@ -419,9 +434,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         : "Option added successfully",
     });
   };
-
-
-
 
   const handleRemoveOption = (optionToRemove: string, specificParent?: string | null) => {
     if (isDependentDropdown) {
@@ -811,7 +823,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     });
   };
 
-
   const getFilteredOptions = (
     options: DropdownOption[],
     selectedParent: string | null
@@ -836,6 +847,251 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     }
     // Default case - show shared options
     return options.filter((opt) => opt.parent === null);
+  };
+
+  // Add CSV template download function
+  const handleExportTemplate = () => {
+    if (!selectedTable || !selectedColumn || !isDependentDropdown || !parentColumn) {
+      toast({
+        title: "Error",
+        description: "Please select a table, column, and enable dependent dropdown with a parent column",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create CSV content with headers
+    const headers = ["parent_value", "option_value"];
+    const csvContent = headers.join(',') + '\n';
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${selectedTable}_${selectedColumn}_options_template.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
+    toast({
+      title: "Success",
+      description: "Template downloaded successfully",
+    });
+  };
+
+  // Add CSV upload handler
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!selectedTable || !selectedColumn || !isDependentDropdown || !parentColumn) {
+      toast({
+        title: "Error",
+        description: "Please select a table, column, and enable dependent dropdown with a parent column",
+        variant: "destructive",
+      });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setIsUploading(true);
+    setCSVErrors([]);
+    setShowErrors(true);
+
+    try {
+      // Validate file type
+      if (!file.type && !file.name.endsWith(".csv")) {
+        throw new Error("Please upload a valid CSV file");
+      }
+
+      // Parse CSV file
+      const results = await new Promise<Papa.ParseResult<Record<string, any>>>(
+        (resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: resolve,
+            error: reject,
+            transformHeader: (header) => header.trim(),
+          });
+        }
+      );
+
+      // Validate headers
+      const requiredHeaders = ["parent_value", "option_value"];
+      const csvHeaders = Object.keys(results.data[0] || {}).map((header) =>
+        header.trim().toLowerCase()
+      );
+      
+      const missingHeaders = requiredHeaders.filter(
+        (header) => !csvHeaders.includes(header.toLowerCase())
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(`Missing required columns: ${missingHeaders.join(", ")}`);
+      }
+
+      // Validate data and track invalid rows
+      const validationErrors: CSVValidationError[] = [];
+      const validRows: Array<{parent_value: string, option_value: string}> = [];
+      
+      results.data.forEach((row, index) => {
+        const rowNum = index + 2; // +2 because row 1 is headers
+        let rowValid = true;
+        
+        // Check for empty parent_value
+        if (!row.parent_value || !row.parent_value.trim()) {
+          validationErrors.push({
+            row: rowNum,
+            column: "parent_value",
+            message: "Parent value cannot be empty",
+          });
+          rowValid = false;
+        } else if (row.parent_value.trim().toLowerCase() !== 'shared') {
+          // Check if parent value exists in parentOptions
+          const parentValueExists = parentOptions.some(
+            option => option.toLowerCase() === row.parent_value.trim().toLowerCase()
+          );
+          
+          if (!parentValueExists) {
+            validationErrors.push({
+              row: rowNum,
+              column: "parent_value",
+              message: `Parent value "${row.parent_value.trim()}" does not exist in parent options`,
+            });
+            rowValid = false;
+          }
+        }
+        
+        // Check for empty option_value
+        if (!row.option_value || !row.option_value.trim()) {
+          validationErrors.push({
+            row: rowNum,
+            column: "option_value",
+            message: "Option value cannot be empty",
+          });
+          rowValid = false;
+        }
+        
+        // If row is valid, add to valid rows array
+        if (rowValid) {
+          validRows.push({
+            parent_value: sanitizeInput(String(row.parent_value).trim()),
+            option_value: sanitizeInput(String(row.option_value).trim())
+          });
+        }
+      });
+
+      if (validationErrors.length > 0) {
+        setCSVErrors(validationErrors);
+        if (validRows.length === 0) {
+          setIsUploading(false);
+          return; // Stop here if there are no valid rows
+        }
+        
+        // Continue with valid rows but show errors for invalid ones
+        toast({
+          title: "Warning",
+          description: `Skipping ${validationErrors.length} invalid rows. Processing ${validRows.length} valid rows.`,
+          variant: "destructive",
+        });
+      }
+      
+      // Skip empty data
+      if (validRows.length === 0) {
+        toast({
+          title: "Error",
+          description: "No valid data found in the CSV file",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      // Remove duplicates within the CSV data
+      const uniqueOptions = new Map<string, { parent_value: string, option_value: string }>();
+      const duplicatesInCSV: string[] = [];
+      
+      validRows.forEach(row => {
+        const key = `${row.parent_value.toLowerCase()}-${row.option_value.toLowerCase()}`;
+        if (!uniqueOptions.has(key)) {
+          uniqueOptions.set(key, {
+            parent_value: row.parent_value,
+            option_value: row.option_value
+          });
+        } else {
+          duplicatesInCSV.push(`${row.option_value} (parent: ${row.parent_value})`);
+        }
+      });
+      
+      if (duplicatesInCSV.length > 0) {
+        toast({
+          title: "Info",
+          description: `Skipping ${duplicatesInCSV.length} duplicate entries in CSV`,
+        });
+      }
+      
+      // Prepare data for API, removing duplicates
+      const uniqueValidRows = Array.from(uniqueOptions.values());
+      
+      console.log("CSV data to be sent to API:", {
+        tableName: selectedTable,
+        columnName: selectedColumn,
+        parentColumn: parentColumn,
+        options: uniqueValidRows,
+        sample: uniqueValidRows.length > 0 ? uniqueValidRows[0] : null
+      });
+      
+      // Send data to the API endpoint
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:8080/api/admin/dropdowns/${selectedTable}/bulk-upload`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            columnName: selectedColumn,
+            parentColumn: parentColumn,
+            options: uniqueValidRows
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API error response:", errorData);
+        throw new Error(errorData.message || "Failed to upload options");
+      }
+      
+      const data = await response.json();
+      console.log("API success response:", data);
+      
+      toast({
+        title: "Success",
+        description: data.message || `Processed ${uniqueValidRows.length} options from CSV`,
+      });
+      
+      // Refresh data to show updated options
+      await fetchExistingOptions();
+      
+    } catch (error) {
+      console.error("CSV upload error:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process CSV file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
@@ -1039,6 +1295,55 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
                   </div>
                 )}
 
+                {/* CSV Upload and Download Buttons for Dependent Dropdowns */}
+                {isDependentDropdown && parentColumn && (
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+                    <div className="flex flex-col gap-4">
+                      <h4 className="text-sm font-medium text-gray-700">Bulk Options Management</h4>
+                      
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleExportTemplate}
+                          className="bg-[#00bfa5]/10 border border-[#00bfa5]/20 hover:bg-[#00bfa5]/20 text-gray-700 flex items-center gap-2"
+                        >
+                          <Download className="h-4 w-4 text-[#00bfa5]" />
+                          Download Template
+                        </Button>
+                        
+                        <div>
+                          <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleCSVUpload}
+                            ref={fileInputRef}
+                            className="hidden"
+                            id="csv-dropdown-upload"
+                          />
+                          <label
+                            htmlFor="csv-dropdown-upload"
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md 
+                            ${isUploading
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "bg-[#0F172A] text-white hover:bg-[#0F172A]/90 cursor-pointer"
+                            }
+                            font-medium text-sm`}
+                          >
+                            <Upload
+                              className={`h-4 w-4 ${isUploading ? "text-gray-400" : "text-white"}`}
+                            />
+                            {isUploading ? "Uploading..." : "Upload CSV"}
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-500">
+                        Use the template to bulk upload options for this dependent dropdown. 
+                        Format: <span className="font-mono bg-gray-100 px-1 rounded">parent_value,option_value</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {isDependentDropdown && !parentColumn && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
                     <p className="text-sm text-yellow-800">
@@ -1049,6 +1354,41 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Display CSV Validation Errors */}
+        {csvErrors.length > 0 && showErrors && (
+          <div className="mb-6 p-4 border border-red-200 rounded-lg bg-red-50 shadow-sm relative">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertCircle className="h-4 w-4" />
+                <h3 className="font-medium">CSV Validation Errors</h3>
+              </div>
+              <button
+                onClick={() => setShowErrors(false)}
+                className="p-1 hover:bg-red-100 rounded-full transition-colors"
+                aria-label="Close error messages"
+              >
+                <X className="h-4 w-4 text-red-500" />
+              </button>
+            </div>
+            <div className="max-h-40 overflow-auto pr-2">
+              <ul className="space-y-1.5">
+                {csvErrors.map((error, index) => (
+                  <li
+                    key={index}
+                    className="text-sm text-red-600 flex items-start gap-2"
+                  >
+                    <span className="min-w-[4rem] font-medium">
+                      Row {error.row}:
+                    </span>
+                    <span className="font-medium">{error.column}</span>
+                    <span className="text-red-500">- {error.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 

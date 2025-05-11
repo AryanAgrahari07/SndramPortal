@@ -102,7 +102,7 @@ const { AdminHistory } = require("../controllers/adminHistory/AdminHistory.js");
 const { toggleGroup } = require("../controllers/toggleGroup/toggleGroup.js");
 const { updateColumnRename, getColumnRenames, deleteColumnRename } = require("../controllers/columnRename/columnRename.js");
 const { getRenamed } = require("../controllers/fetchrenamed/fetchrenamed.js");
-const { getDropdownConfig, getFilteredOptions, updateDropdownConfig } = require("../controllers/dropdown/dependentdropdown.js");
+const { getDropdownConfig, getFilteredOptions, updateDropdownConfig, bulkUploadDropdownOptions } = require("../controllers/dropdown/dependentdropdown.js");
 // Import validation controller
 const {
   getValidationRule,
@@ -270,6 +270,8 @@ router.put(
 router.get('/api/dropdowns/:tableName', verifyToken, getDropdownConfig);
 router.get('/api/dropdowns/:tableName/:columnName/:parentValue', verifyToken, getFilteredOptions);
 router.put('/api/admin/dropdowns/:tableName', verifyToken, authorize("admin"), logAdminAction("UPDATE", "DROPDOWN_MANAGEMENT"), updateDropdownConfig);
+// Add new route for bulk CSV upload of dropdown options
+router.post('/api/admin/dropdowns/:tableName/bulk-upload', verifyToken, authorize("admin"), logAdminAction("UPDATE", "DROPDOWN_MANAGEMENT"), bulkUploadDropdownOptions);
 
 // Admin logs routes
 router.get("/admin/logs", verifyToken, authorize("admin"), getAdminLogs);
