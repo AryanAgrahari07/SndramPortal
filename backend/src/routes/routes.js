@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { verifyToken, authorize } = require("../middleware/auth.js");
+const logAdminAction = require("../middleware/logAdminAction.js");
 
 const otpRequestLimiter = require("../middleware/otpRequestLimiter");
 // Import controllers
@@ -111,15 +112,21 @@ const {
   getTableValidationRules
 } = require("../controllers/valids/validationController.js");
 const { fetchColumnwithdatatype } = require("../controllers/fetchColumn/fetchcolwithdatatype.js");
+const { 
+  getAdminLogs, 
+  getSections,
+  getActionTypes,
+  getLogById
+} = require("../controllers/adminLogsController.js");
 
-router.post("/column-rename", verifyToken, authorize("admin"), updateColumnRename);
+router.post("/column-rename", verifyToken, authorize("admin"), logAdminAction("UPDATE", "COLUMN_RENAME"), updateColumnRename);
 router.get("/columns/:table_name", verifyToken, authorize("admin"), getColumnRenames);
-router.delete("/column-rename/:table_name/:column_name", verifyToken, authorize("admin"), deleteColumnRename)
+router.delete("/column-rename/:table_name/:column_name", verifyToken, authorize("admin"), logAdminAction("DELETE", "COLUMN_RENAME"), deleteColumnRename)
 
 router.get("/renamed/:table_name", verifyToken, getRenamed);
 
 //toggle group route
-router.post('/toggle', verifyToken,authorize("admin"), toggleGroup);
+router.post('/toggle', verifyToken,authorize("admin"), logAdminAction("UPDATE", "GROUP_MANAGEMENT"), toggleGroup);
 
 //admin history route
 router.get('/history',verifyToken,authorize("admin"),AdminHistory);
@@ -140,7 +147,7 @@ router.post("/users/emails", verifyToken, getUserEmails);
 router.get("/api/tabledata/:tableName", verifyToken, getTableData);
 
 // Public routes
-router.post("/signup", verifyToken, authorize("admin"), createUser);
+router.post("/signup", verifyToken, authorize("admin"), logAdminAction("CREATE", "USER_MANAGEMENT"), createUser);
 
 //opt auth endpoints
 router.post("/send-otp", otpRequestLimiter ,sendOTP);
@@ -149,8 +156,8 @@ router.post("/auth/verify-otp", otpVerificationLimiter,verifyOTP);
 // User management routes - Admin only
 router.get("/users", verifyToken, getAllUsers);
 router.get("/users/:id", verifyToken, getUserById);
-router.put("/users/:id", verifyToken, authorize("admin"), updateUser);
-router.post("/isactive", verifyToken, authorize("admin"), isActive);
+router.put("/users/:id", verifyToken, authorize("admin"), logAdminAction("UPDATE", "USER_MANAGEMENT"), updateUser);
+router.post("/isactive", verifyToken, authorize("admin"), logAdminAction("UPDATE", "USER_MANAGEMENT"), isActive);
 
 // Data routes - Authenticated users
 router.get("/fetchchangetrackerdata", verifyToken, fetchChangeTrackerData);
@@ -163,23 +170,23 @@ router.post("/approve", verifyToken, authorize("checker"), approve);
 router.post("/reject", verifyToken, authorize("checker"), reject);
 
 //column configuration routes
-router.post("/columnPermission", verifyToken, ColumnPermission);
+router.post("/columnPermission", verifyToken, authorize("admin"), logAdminAction("UPDATE", "COLUMN_PERMISSION"), ColumnPermission);
 router.post("/fetchcolumn", verifyToken, fetchColumn);
 router.post("/fetchcolumnwithdatatype", verifyToken, fetchColumnwithdatatype);
 
 //dropdown configuratuon routes
 router.post("/fetchColumnDropDown", verifyToken, fetchColumnDropDown);
-router.post("/updateColumnDropDown", verifyToken, updateColumnDropDown);
+router.post("/updateColumnDropDown", verifyToken, authorize("admin"), logAdminAction("UPDATE", "DROPDOWN_MANAGEMENT"), updateColumnDropDown);
 router.post("/fetchColumnStatus", verifyToken, fetchColumnStatus);
 router.post("/fetchDropdownOptions", verifyToken, fetchDropdownOptions);
 
 // group configuration routes
-router.post("/addgroup", verifyToken, authorize("admin"), addGroup); //create group
-router.post("/addtable", verifyToken, authorize("admin"), addTable); // add table inside of a group
+router.post("/addgroup", verifyToken, authorize("admin"), logAdminAction("CREATE", "GROUP_MANAGEMENT"), addGroup); //create group
+router.post("/addtable", verifyToken, authorize("admin"), logAdminAction("UPDATE", "GROUP_MANAGEMENT"), addTable); // add table inside of a group
 router.get("/getgrouplist", verifyToken, getGroupList); //show all group and table list respectively
 router.get("/getgrouplistmaker", verifyToken, getGroupListMaker); //show all group and table list respectively
-router.post("/removegroup", verifyToken, authorize("admin"), removeGroup);
-router.post("/removetable", verifyToken, authorize("admin"), removeTable);
+router.post("/removegroup", verifyToken, authorize("admin"), logAdminAction("DELETE", "GROUP_MANAGEMENT"), removeGroup);
+router.post("/removetable", verifyToken, authorize("admin"), logAdminAction("UPDATE", "GROUP_MANAGEMENT"), removeTable);
 
 //checker logs
 router.get(
@@ -243,27 +250,32 @@ router.get(
 );
 
 // Table metadata routes
-router.post("/rename-tables", verifyToken, authorize("admin"), renameTable);
+router.post("/rename-tables", verifyToken, authorize("admin"), logAdminAction("CREATE", "TABLE_CONFIG"), renameTable);
 router.get("/get-renamed-tables", verifyToken, getRenamedTables);
 router.delete(
   "/delete-renamed-tables/:id",
   verifyToken,
   authorize("admin"),
+  logAdminAction("DELETE", "TABLE_CONFIG"),
   deleteRenamedTable
 );
 router.put(
   "/update-renamed-tables/:id",
   verifyToken,
   authorize("admin"),
+  logAdminAction("UPDATE", "TABLE_CONFIG"),
   updateRenamedTable
 );
 
 router.get('/api/dropdowns/:tableName', verifyToken, getDropdownConfig);
 router.get('/api/dropdowns/:tableName/:columnName/:parentValue', verifyToken, getFilteredOptions);
-router.put('/api/admin/dropdowns/:tableName', verifyToken, authorize("admin"), updateDropdownConfig);
+router.put('/api/admin/dropdowns/:tableName', verifyToken, authorize("admin"), logAdminAction("UPDATE", "DROPDOWN_MANAGEMENT"), updateDropdownConfig);
 
-
-
+// Admin logs routes
+router.get("/admin/logs", verifyToken, authorize("admin"), getAdminLogs);
+router.get("/admin/logs/sections", verifyToken, authorize("admin"), getSections);
+router.get("/admin/logs/action-types", verifyToken, authorize("admin"), getActionTypes);
+router.get("/admin/logs/:id", verifyToken, authorize("admin"), getLogById);
 
 // Validation routes
 router.get(
@@ -283,6 +295,7 @@ router.post(
   "/admin/validations/rules",
   verifyToken,
   authorize("admin"),
+  logAdminAction("UPDATE", "VALIDATION_CONFIG"),
   upsertValidationRule
 );
 
@@ -290,6 +303,7 @@ router.delete(
   "/admin/validations/:tableName/:columnName",
   verifyToken,
   authorize("admin"),
+  logAdminAction("DELETE", "VALIDATION_CONFIG"),
   deleteValidationRule
 );
 
@@ -297,6 +311,7 @@ router.patch(
   "/admin/validations/:tableName/:columnName/status",
   verifyToken,
   authorize("admin"),
+  logAdminAction("UPDATE", "VALIDATION_CONFIG"),
   toggleValidationRule
 );
 module.exports = router;

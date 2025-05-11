@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Layout } from "../components/Layout";
-import { UserManagement, RowRequestManager } from "@/components/admin";
-
+import { UserManagement, RowRequestManager, AdminLogs } from "@/components/admin";
 import Configuration from "@/components/admin/Configuration";
 import { useSearchParams } from "react-router-dom";
 import { AdminHistory } from "@/components/admin/AdminHistory";
@@ -9,7 +8,7 @@ import { AdminHistory } from "@/components/admin/AdminHistory";
 const AdminPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<
-    "rowRequests" | "configuration" | "userManagement" | "adminHistory"
+    "rowRequests" | "configuration" | "userManagement" | "adminHistory" | "adminLogs"
   >("rowRequests");
   // const firstName = localStorage.getItem("firstName") || "Admin";
 
@@ -72,17 +71,28 @@ const AdminPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-               History
+              History
+            </button>
+            <button
+              onClick={() => setActiveTab("adminLogs")}
+              className={`py-2 px-1 inline-flex items-center border-b-2 ${
+                activeTab === "adminLogs"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Logs
             </button>
           </nav>
         </div>
 
         {/* Content Area */}
         <div className="mt-6">
-          {activeTab === "rowRequests" && <RowRequestManager selectTable = {selectTable} />}
+          {activeTab === "rowRequests" && <RowRequestManager selectTable={selectTable} />}
           {activeTab === "configuration" && <Configuration />}
           {activeTab === "userManagement" && <UserManagement />}
           {activeTab === "adminHistory" && <AdminHistory />}
+          {activeTab === "adminLogs" && <AdminLogs />}
         </div>
       </div>
     </Layout>
