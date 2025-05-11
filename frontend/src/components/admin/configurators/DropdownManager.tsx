@@ -1001,6 +1001,9 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       const validationErrors: CSVValidationError[] = [];
       const validRows: Array<{parent_value: string, option_value: string}> = [];
       
+      // Track new parent values that need to be added
+      const newParentValues = new Set<string>();
+      
       // Process each row sequentially with validation
       for (let index = 0; index < results.data.length; index++) {
         const row = results.data[index];
@@ -1021,13 +1024,10 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             option => option.toLowerCase() === row.parent_value.trim().toLowerCase()
           );
           
+          // Instead of marking as invalid, track new parent values
           if (!parentValueExists) {
-            validationErrors.push({
-              row: rowNum,
-              column: "parent_value",
-              message: `Parent value "${row.parent_value.trim()}" does not exist in parent options`,
-            });
-            rowValid = false;
+            // Add it to our set of new parent values to create
+            newParentValues.add(row.parent_value.trim());
           }
         }
         
@@ -1095,6 +1095,14 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         return;
       }
 
+      // Show notification about new parent values
+      if (newParentValues.size > 0) {
+        toast({
+          title: "Info",
+          description: `Adding ${newParentValues.size} new parent values: ${Array.from(newParentValues).join(', ')}`,
+        });
+      }
+
       // Remove duplicates within the CSV data
       const uniqueOptions = new Map<string, { parent_value: string, option_value: string }>();
       const duplicatesInCSV: string[] = [];
@@ -1121,14 +1129,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       // Prepare data for API, removing duplicates
       const uniqueValidRows = Array.from(uniqueOptions.values());
       
-      // console.log("CSV data to be sent to API:", {
-      //   tableName: selectedTable,
-      //   columnName: selectedColumn,
-      //   parentColumn: parentColumn,
-      //   options: uniqueValidRows,
-      //   sample: uniqueValidRows.length > 0 ? uniqueValidRows[0] : null
-      // });
-      
       // Send data to the API endpoint
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -1143,13 +1143,14 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
           body: JSON.stringify({
             columnName: selectedColumn,
             parentColumn: parentColumn,
-            options: uniqueValidRows
+            options: uniqueValidRows,
+            newParentValues: Array.from(newParentValues),
+            autoAddNewParentValues: true
           }),
         }
       );
       
       const data = await response.json();
-      // console.log("API response:", data);
       
       // Process API response to extract validation errors, regardless of success status
       const processBackendValidationErrors = () => {
@@ -1226,8 +1227,9 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             const skipped = data.skipped !== undefined ? `${data.skipped} skipped` : '';
             const rejected = data.rejected !== undefined ? `${data.rejected} rejected` : '';
             const shared = data.shared !== undefined ? `${data.shared} shared` : '';
+            const newParentsAdded = data.newParentsAdded !== undefined ? `${data.newParentsAdded} new parents added` : '';
             
-            const counts = [added, skipped, rejected, shared].filter(Boolean).join(', ');
+            const counts = [added, skipped, rejected, shared, newParentsAdded].filter(Boolean).join(', ');
             successMessage = counts ? `${successMessage} (${counts})` : successMessage;
           }
           
@@ -1235,6 +1237,11 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             title: "Success",
             description: successMessage,
           });
+          
+          // If new parent values were added, refresh parent options
+          if (newParentValues.size > 0 && data.newParentsAdded) {
+            fetchParentOptions(parentColumn);
+          }
         } else {
           // If success is false but the API returned a 200, still treat it as a warning
           toast({
@@ -1247,7 +1254,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
         // Refresh data to show updated options
         await fetchExistingOptions();
       }
-      
     } catch (error) {
       console.error("CSV upload error:", error);
       toast({

@@ -53,6 +53,7 @@ interface ValidationRule {
 interface Column {
   name: string;
   type: string;
+  display_name?: string;
 }
 
 const ValidationConfigurator: React.FC = () => {
@@ -100,7 +101,8 @@ const ValidationConfigurator: React.FC = () => {
     const fetchColumns = async () => {
       if (!selectedTable) return;
       try {
-        const response = await axios.post(
+        // Fetch columns with data types
+        const columnsResponse = await axios.post(
           "http://localhost:8080/fetchcolumnwithdatatype",
           { table_name: selectedTable },
           {
@@ -110,17 +112,37 @@ const ValidationConfigurator: React.FC = () => {
             },
           }
         );
-        if (response.data.success) {
+
+        // Fetch renamed columns
+        const renamesResponse = await axios.get(
+          `http://localhost:8080/columns/${selectedTable}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            withCredentials: true
+          }
+        );
+        
+        if (columnsResponse.data.success) {
           // Filter out columns that match tableName_sk pattern
-          const columnData = response.data.columns
+          const columnData = columnsResponse.data.columns
             .filter((col: Column) => {
               const expectedPkName = `${selectedTable}_sk`.toLowerCase();
               return col.name.toLowerCase() !== expectedPkName;
             })
-            .map((col: Column) => ({
-              name: col.name,
-              type: col.type
-            }));
+            .map((col: Column) => {
+              // Find rename if it exists
+              const rename = renamesResponse.data.columns?.find(
+                (rename: any) => rename.original_column_name === col.name
+              );
+              
+              return {
+                name: col.name,
+                type: col.type,
+                display_name: rename?.renamed_column_name || col.name
+              };
+            });
           setColumns(columnData);
         }
       } catch (error) {
@@ -169,6 +191,12 @@ const ValidationConfigurator: React.FC = () => {
     };
     fetchValidationRule();
   }, [selectedTable, selectedColumn]);
+
+  // Helper function to get display name for the selected column
+  const getSelectedColumnDisplayName = () => {
+    const column = columns.find(col => col.name === selectedColumn);
+    return column?.display_name || selectedColumn;
+  };
 
   const handleSave = async () => {
     if (!selectedTable || !selectedColumn || !validationRule) return;
@@ -221,6 +249,7 @@ const ValidationConfigurator: React.FC = () => {
   const renderValidationPreview = () => {
     if (!validationRule) return null;
 
+    const columnDisplayName = getSelectedColumnDisplayName();
     const rules: string[] = [];
 
     // Basic validations
@@ -251,7 +280,7 @@ const ValidationConfigurator: React.FC = () => {
       <Alert className="mt-4">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          <div className="font-medium mb-2">Current Validation Rules:</div>
+          <div className="font-medium mb-2">Validation Rules for {columnDisplayName}:</div>
           <ul className="list-disc list-inside space-y-1">
             {rules.map((rule, index) => (
               <li key={`rule-${index}`} className="text-sm">{rule}</li>
@@ -313,7 +342,7 @@ const ValidationConfigurator: React.FC = () => {
                 <SelectContent className="bg-white max-h-[200px] overflow-y-auto">
                   {columns.map((column) => (
                     <SelectItem key={`column-${column.name}`} value={column.name}>
-                      {column.name} ({column.type})
+                      {column.display_name || column.name} ({column.type})
                     </SelectItem>
                   ))}
                 </SelectContent>

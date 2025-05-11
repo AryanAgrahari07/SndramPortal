@@ -346,7 +346,7 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
     }
     
     const { tableName } = req.params;
-    const { columnName, parentColumn, options } = req.body;
+    const { columnName, parentColumn, options, newParentValues = [], autoAddNewParentValues = false } = req.body;
     
     // console.log("Received bulk upload request:", {
     //     tableName,
@@ -456,6 +456,9 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
         
         // Get all existing parent column values to validate against
         let parentColumnValues = [];
+        let allOptions = [];
+        let parentColumnConfig = null;
+        
         try {
             // First check if we have parent dropdown values defined
             const parentValuesQuery = `
@@ -467,9 +470,9 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
             const parentValuesResult = await client_update.query(parentValuesQuery, [tableName]);
             
             if (parentValuesResult.rows.length > 0) {
-                const dropdownOptions = parentValuesResult.rows[0].dropdown_options || [];
+                allOptions = parentValuesResult.rows[0].dropdown_options || [];
                 // Find the parent column configuration
-                const parentColumnConfig = dropdownOptions.find(opt => opt.columnName === parentColumn);
+                parentColumnConfig = allOptions.find(opt => opt.columnName === parentColumn);
                 
                 if (parentColumnConfig && Array.isArray(parentColumnConfig.options)) {
                     // Extract parent values
@@ -485,6 +488,20 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
             // Continue processing as we can still handle 'shared' values
         }
         
+        // Track new parent values that need to be added
+        const newParentValuesToAdd = new Set();
+        
+        // If autoAddNewParentValues is enabled, process newParentValues
+        if (autoAddNewParentValues && Array.isArray(newParentValues) && newParentValues.length > 0) {
+            // Add new parent values that don't already exist
+            for (const newParent of newParentValues) {
+                if (newParent && typeof newParent === 'string' && 
+                    !parentColumnValues.includes(newParent.toLowerCase())) {
+                    newParentValuesToAdd.add(newParent);
+                }
+            }
+        }
+        
         // Additional validation for parent values that aren't 'shared'
         const invalidParentValues = [];
         const finalValidOptions = validOptions.filter(opt => {
@@ -498,18 +515,25 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
                 return true;
             }
             
-            // Check if parent value exists
-            const parentExists = parentColumnValues.includes(opt.parent_value.toLowerCase());
-            if (!parentExists) {
+            // Check if parent value exists or is going to be added as a new parent value
+            const parentExists = parentColumnValues.includes(opt.parent_value.toLowerCase()) || 
+                                 newParentValuesToAdd.has(opt.parent_value);
+            
+            if (!parentExists && !autoAddNewParentValues) {
                 invalidParentValues.push(opt.parent_value);
                 return false;
+            }
+            
+            // If autoAddNewParentValues is true, accept this option and add parent to list of new ones
+            if (!parentExists && autoAddNewParentValues) {
+                newParentValuesToAdd.add(opt.parent_value);
             }
             
             return true;
         });
         
-        if (invalidParentValues.length > 0) {
-            console.log(`Rejected ${invalidParentValues.length} options with invalid parent values`);
+        if (invalidParentValues.length > 0 && !autoAddNewParentValues) {
+            // console.log(`Rejected ${invalidParentValues.length} options with invalid parent values`);
         }
         
         if (finalValidOptions.length === 0) {
@@ -525,6 +549,7 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
         let addedCount = 0;
         let skippedDuplicates = 0;
         let sharedCount = 0;
+        let newParentsAdded = 0;
         
         // Process the options from CSV
         const processedOptions = [];
@@ -619,36 +644,74 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
             }
         });
         
+        // Now add new parent values to the parent column dropdown options
+        if (newParentValuesToAdd.size > 0 && parentColumnConfig) {
+            for (const newParentValue of newParentValuesToAdd) {
+                const parentOptionExists = parentColumnConfig.options.some(
+                    opt => typeof opt === 'string' 
+                        ? opt.toLowerCase() === newParentValue.toLowerCase()
+                        : opt.value.toLowerCase() === newParentValue.toLowerCase()
+                );
+                
+                if (!parentOptionExists) {
+                    // Add the new parent value to the parent column options
+                    // Use the same format as existing options (string or object)
+                    if (typeof parentColumnConfig.options[0] === 'string') {
+                        parentColumnConfig.options.push(newParentValue);
+                    } else {
+                        parentColumnConfig.options.push({
+                            value: newParentValue
+                        });
+                    }
+                    newParentsAdded++;
+                }
+            }
+            
+            // console.log(`Added ${newParentsAdded} new parent values to ${parentColumn} dropdown options`);
+        }
+        
         if (result.rows.length > 0) {
             // Update existing configuration
             const rowId = result.rows[0].row_id;
-            let allOptions = [...existingOptions]; // Copy existing options array
+            let allUpdatedOptions = [...existingOptions]; // Copy existing options array
             
             // Find if this column already has configuration
-            const existingIndex = allOptions.findIndex(
+            const existingIndex = allUpdatedOptions.findIndex(
                 item => item.columnName === columnName
             );
             
-            console.log("Existing configuration:", {
-                hasExistingConfig: existingIndex > -1,
-                existingColumnIndex: existingIndex,
-                processedOptionsCount: processedOptions.length
-            });
+            // console.log("Existing configuration:", {
+            //     hasExistingConfig: existingIndex > -1,
+            //     existingColumnIndex: existingIndex,
+            //     processedOptionsCount: processedOptions.length
+            // });
             
             if (existingIndex > -1) {
                 // Update existing column configuration
-                allOptions[existingIndex] = {
-                    ...allOptions[existingIndex],
+                allUpdatedOptions[existingIndex] = {
+                    ...allUpdatedOptions[existingIndex],
                     options: processedOptions, // Use merged options array
                     parentColumn: parentColumn
                 };
             } else {
                 // Column does not exist, add new column
-                allOptions.push({
+                allUpdatedOptions.push({
                     columnName: columnName,
                     options: processedOptions,
                     parentColumn: parentColumn
                 });
+            }
+            
+            // If we need to update the parent column options, find and update that configuration
+            if (newParentsAdded > 0) {
+                const parentIndex = allUpdatedOptions.findIndex(
+                    item => item.columnName === parentColumn
+                );
+                
+                if (parentIndex > -1) {
+                    // Update parent column with new parent values
+                    allUpdatedOptions[parentIndex] = parentColumnConfig;
+                }
             }
             
             // Update the table
@@ -661,11 +724,11 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
             
             try {
                 await client_update.query(updateQuery, [
-                    JSON.stringify(allOptions),
+                    JSON.stringify(allUpdatedOptions),
                     now,
                     rowId
                 ]);
-                console.log("Successfully updated dropdown options in database");
+                // console.log("Successfully updated dropdown options in database");
             } catch (dbError) {
                 console.error("Database update error:", dbError);
                 throw dbError;
@@ -678,6 +741,11 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
                 options: processedOptions,
                 parentColumn: parentColumn
             }];
+            
+            // If we have new parent values, add the parent column configuration
+            if (newParentsAdded > 0 && parentColumnConfig) {
+                newOptions.push(parentColumnConfig);
+            }
             
             const insertQuery = `
                 INSERT INTO app.dynamic_dropdowns 
@@ -696,11 +764,12 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
         
         return res.status(200).json({
             success: true,
-            message: `Successfully processed options: ${addedCount} added, ${skippedDuplicates} skipped (duplicates)${invalidParentValues.length > 0 ? `, ${invalidParentValues.length} rejected (invalid parent values)` : ''}`,
+            message: `Successfully processed options: ${addedCount} added, ${skippedDuplicates} skipped (duplicates)${invalidParentValues.length > 0 ? `, ${invalidParentValues.length} rejected (invalid parent values)` : ''}${newParentsAdded > 0 ? `, ${newParentsAdded} new parent values added` : ''}`,
             added: addedCount,
             skipped: skippedDuplicates,
             rejected: invalidParentValues.length,
-            shared: sharedCount
+            shared: sharedCount,
+            newParentsAdded: newParentsAdded
         });
     } catch (error) {
         console.error("Error bulk uploading dropdown options:", error);
