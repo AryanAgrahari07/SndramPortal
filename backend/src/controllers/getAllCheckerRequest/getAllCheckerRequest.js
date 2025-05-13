@@ -41,12 +41,18 @@ exports.getAllCheckerRequest = async (req, res) => {
 
     if (startDate) {
       whereClause += ` AND ct.updated_at >= $${values.length + 1}`;
-      values.push(startDate);
+      // Set to beginning of the day
+      const startOfDay = new Date(startDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      values.push(startOfDay.toISOString());
     }
 
     if (endDate) {
       whereClause += ` AND ct.updated_at <= $${values.length + 1}`;
-      values.push(endDate);
+      // Add time component to include the entire day
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      values.push(endOfDay.toISOString());
     }
 
     // Debugging: Log the constructed SQL query and parameters

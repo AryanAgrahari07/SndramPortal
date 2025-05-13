@@ -22,6 +22,7 @@ import { Pagination } from "@/components/Pagination";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { fetchCheckerRequests } from "@/services/checkerService";
+import { API_URL, ENDPOINTS } from "@/config/constants";
 
 interface HistoryRequest {
   request_id: string;
@@ -75,16 +76,24 @@ export const History = () => {
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true);
+    console.log("Loading requests with params:", { 
+      searchQuery, 
+      filterStatus, 
+      startDate: customDateRange.from, 
+      endDate: customDateRange.to, 
+      page: currentPage 
+    });
     try {
       const data = await fetchCheckerRequests(
         searchQuery,
         filterStatus,
         customDateRange.from,
-        customDateRange.to
+        customDateRange.to,
+        currentPage
       );
+      console.log("Received data:", data);
       if (data.success) {
         setRequests(data.data);
-        // setTotalPages(data.total);
         setTotalPages(Math.ceil(data.total / itemsPerPage));
       } else {
         toast({
@@ -95,12 +104,17 @@ export const History = () => {
       }
     } catch (error) {
       console.error("Error fetching history:", error);
-      // toast.error("An error occurred while fetching history");
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, filterStatus, customDateRange, dateFilter]);
+  }, [searchQuery, filterStatus, customDateRange, dateFilter, currentPage]);
 
+  // Reset requests array when filter status changes
+  useEffect(() => {
+    setRequests([]);
+  }, [filterStatus]);
+
+  // This useEffect runs whenever loadRequests changes
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
@@ -108,7 +122,7 @@ export const History = () => {
   const handleSearch = () => {
     setSearchQuery(searchText);
     setCurrentPage(1); // Reset to the first page
-    loadRequests();
+    // No need to call loadRequests() as changing currentPage will trigger it
   };
 
   const handleDateChange = (type: "from" | "to", value: string) => {
@@ -123,7 +137,7 @@ export const History = () => {
   const fetchRenamed = async (tableName: string) => {
     try {
       setIsLoadingColumns(true);
-      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+      const response = await fetch(`${API_URL}${ENDPOINTS.CHECKER.GET_RENAMED}/${tableName}`, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -203,11 +217,11 @@ export const History = () => {
 
   const clearFilters = () => {
     setSearchQuery("");
+    setSearchText("");
     setDateFilter("all");
     setCustomDateRange({ from: "", to: "" });
     setCurrentPage(1);
-    loadRequests();
-    setSearchText("");
+    // No need to call loadRequests() as changing currentPage will trigger it
   };
 
   const handleFilterChange = (status: FilterStatus) => {
@@ -217,9 +231,7 @@ export const History = () => {
     setSearchQuery("");
     setCustomDateRange({ from: "", to: "" });
     setCurrentPage(1); // Reset to the first page
-
-    setRequests([]);
-    loadRequests();
+    // No need to call loadRequests as changing the dependencies will trigger it
   };
 
   return (
@@ -403,8 +415,8 @@ export const History = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={(page) => {
+            console.log("Changing page to:", page);
             setCurrentPage(page);
-            loadRequests();
           }}
         />
       )}
