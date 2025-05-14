@@ -174,6 +174,22 @@ exports.updateDropdownConfig = async (req, res) => {
     }
     
     try {
+        // First fetch existing dropdown config for logging comparison
+        const fetchExistingQuery = `
+            SELECT dropdown_options 
+            FROM app.dynamic_dropdowns 
+            WHERE table_name = $1;
+        `;
+        
+        const existingResult = await client_update.query(fetchExistingQuery, [tableName]);
+        
+        // Set old_dropdown_options in request body for logging middleware
+        if (existingResult.rows.length > 0) {
+            req.body.old_options = existingResult.rows[0].dropdown_options || [];
+        } else {
+            req.body.old_options = [];
+        }
+        
         // Validate dropdown options structure
         for (const option of dropdown_options) {
             if (!option.columnName) {
@@ -370,6 +386,22 @@ exports.bulkUploadDropdownOptions = async (req, res) => {
     }
     
     try {
+        // Fetch existing dropdown config for logging comparison
+        const fetchExistingQuery = `
+            SELECT dropdown_options 
+            FROM app.dynamic_dropdowns 
+            WHERE table_name = $1;
+        `;
+        
+        const existingResult = await client_update.query(fetchExistingQuery, [tableName]);
+        
+        // Set old_options in request body for logging middleware
+        if (existingResult.rows.length > 0) {
+            req.body.old_options = existingResult.rows[0].dropdown_options || [];
+        } else {
+            req.body.old_options = [];
+        }
+        
         // Get column data type for validation
         const typeQuery = `
             SELECT data_type 

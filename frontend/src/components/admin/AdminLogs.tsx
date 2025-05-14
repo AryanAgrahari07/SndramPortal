@@ -364,10 +364,98 @@ const AdminLogs: React.FC = () => {
         return `Updated permissions for ${info.editable_count || 0} editable and ${info.non_editable_count || 0} non-editable columns in table "${info.table_name || log.target_table}"`;
         
       case "DROPDOWN_MANAGEMENT":
-        if (info.is_dependent || log.action_details?.requestBody?.parent_column) {
-          return `Updated dependent dropdown options for ${info.table_name || log.target_table}.${info.column_name || ''} with parent ${info.parent_column || log.action_details?.requestBody?.parent_column || ''}`;
+        // Focus on showing specific changes
+        const changeDetails = [];
+        
+        // Show counts of specific changes for dependent dropdowns
+        if (info.dependent_changes && Object.keys(info.dependent_changes).length > 0) {
+          const dependentChanges = Object.entries(info.dependent_changes).map(([col, data]: [string, any]) => {
+            const addedCount = data.added?.length || 0;
+            const removedCount = data.removed?.length || 0;
+            
+            if (addedCount > 0 && removedCount > 0) {
+              return `${col} (+${addedCount}/-${removedCount})`;
+            } else if (addedCount > 0) {
+              return `${col} (+${addedCount})`;
+            } else if (removedCount > 0) {
+              return `${col} (-${removedCount})`;
+            }
+            return col;
+          });
+          
+          if (dependentChanges.length > 0) {
+            changeDetails.push(`modified dependent columns: ${dependentChanges.join(', ')}`);
+          }
         }
-        return `Updated dropdown options for ${info.table_name || log.target_table}.${info.column_name || ''}`;
+        
+        // Show counts of specific changes for regular dropdowns
+        if (info.regular_changes && Object.keys(info.regular_changes).length > 0) {
+          const regularChanges = Object.entries(info.regular_changes).map(([col, data]: [string, any]) => {
+            const addedCount = data.added?.length || 0;
+            const removedCount = data.removed?.length || 0;
+            
+            if (addedCount > 0 && removedCount > 0) {
+              return `${col} (+${addedCount}/-${removedCount})`;
+            } else if (addedCount > 0) {
+              return `${col} (+${addedCount})`;
+            } else if (removedCount > 0) {
+              return `${col} (-${removedCount})`;
+            }
+            return col;
+          });
+          
+          if (regularChanges.length > 0) {
+            changeDetails.push(`modified regular columns: ${regularChanges.join(', ')}`);
+          }
+        }
+        
+        // Use changes array directly if the structured changes aren't available
+        if ((!info.dependent_changes || Object.keys(info.dependent_changes).length === 0) && 
+            (!info.regular_changes || Object.keys(info.regular_changes).length === 0) && 
+            info.changes) {
+          
+          const addedCount = info.changes.added?.length || 0;
+          const removedCount = info.changes.removed?.length || 0;
+          
+          if (addedCount > 0) {
+            changeDetails.push(`added ${addedCount} option${addedCount !== 1 ? 's' : ''}`);
+          }
+          
+          if (removedCount > 0) {
+            changeDetails.push(`removed ${removedCount} option${removedCount !== 1 ? 's' : ''}`);
+          }
+        }
+        
+        // If we have specific change details, return them
+        if (changeDetails.length > 0) {
+          return `Modified dropdown options for ${info.table_name || log.target_table}: ${changeDetails.join(', ')}`;
+        }
+        
+        // Fall back to legacy format if no specific changes were found
+        if (info.is_dependent || log.action_details?.requestBody?.parent_column) {
+          // For dependent dropdowns, provide more specific information
+          const dependentInfo = [];
+          
+          if (info.dependent_dropdowns && info.dependent_dropdowns.length > 0) {
+            dependentInfo.push(`Updated ${info.dependent_dropdowns.length} dependent columns`);
+          } else if (info.dependent_columns && info.dependent_columns.length > 0) {
+            dependentInfo.push(`Updated ${info.dependent_columns.length} dependent columns`);
+          } else {
+            dependentInfo.push(`parent ${info.parent_column || log.action_details?.requestBody?.parent_column || ''}`);
+          }
+          
+          return `Updated dependent dropdown options for ${info.table_name || log.target_table} (${dependentInfo.join(", ")})`;
+        }
+        
+        // For regular dropdown updates
+        const columnInfo = [];
+        if (info.columns_updated && info.columns_updated.length > 0) {
+          columnInfo.push(`${info.columns_updated.length} columns`);
+        } else if (info.column_name) {
+          columnInfo.push(info.column_name);
+        }
+        
+        return `Updated dropdown options for ${info.table_name || log.target_table}${columnInfo.length > 0 ? ` (${columnInfo.join(", ")})` : ''}`;
         
       case "COLUMN_RENAME":
         return `Renamed column "${info.original_column_name}" to "${info.renamed_column_name}" in table "${info.table_name || log.target_table}"`;
@@ -465,63 +553,159 @@ const AdminLogs: React.FC = () => {
         
       case "DROPDOWN_MANAGEMENT":
         details.push(`Table: ${info.table_name || requestBody.table_name || log.target_table}`);
-        details.push(`Column: ${info.column_name || requestBody.column_name || ''}`);
         
-        // Special handling for dependent dropdowns
-        if (info.is_dependent || requestBody.parent_column) {
-          details.push(`Parent Column: ${info.parent_column || requestBody.parent_column || ''}`);
-          details.push("Dependency configuration updated");
+        // Show precise changes for dependent dropdowns when available
+        if (info.dependent_changes && Object.keys(info.dependent_changes).length > 0) {
+          details.push("🔄 Changes to Dependent Dropdowns:");
+          
+          Object.entries(info.dependent_changes).forEach(([columnName, changes]: [string, any]) => {
+            const parentColumn = changes.parent_column;
+            details.push(`  • Column: ${columnName} (depends on ${parentColumn})`);
+            
+            // Show added options with their parent values
+            if (changes.added && changes.added.length > 0) {
+              details.push("    ➕ Added options:");
+              changes.added.forEach((opt: any) => {
+                details.push(`      - "${opt.value}" under parent "${opt.parent}"`);
+              });
+            }
+            
+            // Show removed options with their parent values
+            if (changes.removed && changes.removed.length > 0) {
+              details.push("    ➖ Removed options:");
+              changes.removed.forEach((opt: any) => {
+                details.push(`      - "${opt.value}" under parent "${opt.parent}"`);
+              });
+            }
+          });
         }
         
-        if (info.dropdown_options) {
-          if (Array.isArray(info.dropdown_options)) {
-            details.push(`Options: ${info.dropdown_options.join(", ")}`);
-          } else if (typeof info.dropdown_options === 'object') {
-            details.push(`Options: ${Object.keys(info.dropdown_options).length} configured`);
+        // Show changes for regular dropdowns
+        if (info.regular_changes && Object.keys(info.regular_changes).length > 0) {
+          details.push("🔄 Changes to Regular Dropdowns:");
+          
+          Object.entries(info.regular_changes).forEach(([columnName, changes]: [string, any]) => {
+            details.push(`  • Column: ${columnName}`);
             
-            // Show some example values for parent-child relationships
-            if (Object.keys(info.dropdown_options).length <= 5) {
-              Object.entries(info.dropdown_options).forEach(([key, values]) => {
-                if (Array.isArray(values)) {
-                  details.push(`  - ${key}: ${(values as string[]).join(", ")}`);
+            // Show added options
+            if (changes.added && changes.added.length > 0) {
+              details.push("    ➕ Added options:");
+              changes.added.forEach((value: any) => {
+                details.push(`      - "${value}"`);
+              });
+            }
+            
+            // Show removed options
+            if (changes.removed && changes.removed.length > 0) {
+              details.push("    ➖ Removed options:");
+              changes.removed.forEach((value: any) => {
+                details.push(`      - "${value}"`);
+              });
+            }
+          });
+        }
+        
+        // Show specific changes when individual items are tracked
+        if (info.changes && (info.changes.added.length > 0 || info.changes.removed.length > 0)) {
+          // Skip if we've already displayed changes through the more structured format above
+          if (!info.dependent_changes && !info.regular_changes) {
+            if (info.changes.added.length > 0) {
+              details.push("➕ Added Options:");
+              info.changes.added.forEach((item: any) => {
+                if (item.parent_column) {
+                  details.push(`  • ${item.column}: "${item.value}" under parent "${item.parent_value}"`);
+                } else {
+                  details.push(`  • ${item.column}: "${item.value}"`);
                 }
               });
-            } else {
-              // Just show a few examples if there are many
-              const keys = Object.keys(info.dropdown_options);
-              details.push(`  Examples (showing 3/${keys.length}):`);
-              for (let i = 0; i < Math.min(3, keys.length); i++) {
-                const key = keys[i];
-                const values = info.dropdown_options[key];
-                if (Array.isArray(values)) {
-                  details.push(`  - ${key}: ${(values as string[]).slice(0, 5).join(", ")}${values.length > 5 ? '...' : ''}`);
+            }
+            
+            if (info.changes.removed.length > 0) {
+              details.push("➖ Removed Options:");
+              info.changes.removed.forEach((item: any) => {
+                if (item.parent_column) {
+                  details.push(`  • ${item.column}: "${item.value}" under parent "${item.parent_value}"`);
+                } else {
+                  details.push(`  • ${item.column}: "${item.value}"`);
+                }
+              });
+            }
+          }
+        }
+        
+        // Fall back to existing approach if we don't have specific change data
+        if ((!info.changes || (info.changes.added.length === 0 && info.changes.removed.length === 0)) &&
+            (!info.dependent_changes || Object.keys(info.dependent_changes).length === 0) &&
+            (!info.regular_changes || Object.keys(info.regular_changes).length === 0)) {
+          
+          // For structured information from our enhanced backend
+          if (info.columns_updated && info.columns_updated.length > 0) {
+            details.push(`Columns Updated: ${info.columns_updated.length}`);
+          } else if (info.column_name) {
+            details.push(`Column: ${info.column_name}`);
+          }
+          
+          // Display count of values rather than all values
+          if (info.regular_dropdowns && info.regular_dropdowns.length > 0) {
+            details.push("Regular Dropdowns:");
+            info.regular_dropdowns.forEach((dropdown: any) => {
+              const valueCount = dropdown.values_count || (dropdown.values ? dropdown.values.length : 0);
+              
+              if (valueCount === 0) {
+                details.push(`  • ${dropdown.column}: No options configured`);
+              } else {
+                details.push(`  • ${dropdown.column}: ${valueCount} options`);
+                
+                // Show examples only if values array is available and not too long
+                if (dropdown.values && Array.isArray(dropdown.values) && dropdown.values.length <= 3) {
+                  details.push(`    Values: ${dropdown.values.join(", ")}`);
                 }
               }
-            }
+            });
           }
-        } else if (requestBody.dropdown_options) {
-          if (Array.isArray(requestBody.dropdown_options)) {
-            details.push(`Options: ${requestBody.dropdown_options.join(", ")}`);
-          } else if (typeof requestBody.dropdown_options === 'object') {
-            const optionsCount = Object.keys(requestBody.dropdown_options).length;
-            details.push(`Options: ${optionsCount} configured`);
-            
-            // Similar examination of parent-child values
-            if (optionsCount <= 5) {
-              Object.entries(requestBody.dropdown_options).forEach(([key, values]) => {
-                if (Array.isArray(values)) {
-                  details.push(`  - ${key}: ${(values as string[]).join(", ")}`);
+          
+          // Display dependent dropdowns with focus on structure, not all values
+          if (info.dependent_dropdowns && info.dependent_dropdowns.length > 0) {
+            details.push("Dependent Dropdowns:");
+            info.dependent_dropdowns.forEach((dropdown: any) => {
+              details.push(`  • ${dropdown.column} (depends on ${dropdown.parent_column})`);
+              
+              const valueCount = dropdown.values_count || (dropdown.values ? dropdown.values.length : 0);
+              if (valueCount === 0) {
+                details.push(`    No options configured`);
+              } else {
+                details.push(`    ${valueCount} options configured`);
+                
+                // Show examples only if values array is available and not too long
+                if (dropdown.values && Array.isArray(dropdown.values) && dropdown.values.length <= 3) {
+                  details.push(`    Examples: ${dropdown.values.join(", ")}`);
                 }
-              });
+              }
+            });
+          }
+          
+          // Fall back to old display format if enhanced data isn't available
+          if (!info.regular_dropdowns && !info.dependent_dropdowns) {
+            if (info.column_name) {
+              details.push(`Column: ${info.column_name || requestBody.column_name || ''}`);
+            }
+            
+            // Special handling for dependent dropdowns
+            if (info.is_dependent || requestBody.parent_column) {
+              details.push(`Parent Column: ${info.parent_column || requestBody.parent_column || ''}`);
+              details.push("Dependency configuration updated");
             }
           }
-        }
-        
-        if (info.added_options && info.added_options.length > 0) {
-          details.push(`Added options: ${info.added_options.join(", ")}`);
-        }
-        if (info.removed_options && info.removed_options.length > 0) {
-          details.push(`Removed options: ${info.removed_options.join(", ")}`);
+          
+          // Legacy format for added/removed options
+          if (info.added_options && info.added_options.length > 0) {
+            const formattedAdded = info.added_options.map((opt: any) => formatDropdownOption(opt));
+            details.push(`Added options: ${formattedAdded.join(", ")}`);
+          }
+          if (info.removed_options && info.removed_options.length > 0) {
+            const formattedRemoved = info.removed_options.map((opt: any) => formatDropdownOption(opt));
+            details.push(`Removed options: ${formattedRemoved.join(", ")}`);
+          }
         }
         break;
         
@@ -614,9 +798,252 @@ const AdminLogs: React.FC = () => {
     return details;
   };
 
+  // Helper function to properly format dropdown option values
+  const formatDropdownOption = (option: any): string => {
+    if (option === null || option === undefined) {
+      return "null";
+    }
+    
+    if (typeof option === 'string' || typeof option === 'number' || typeof option === 'boolean') {
+      return String(option);
+    }
+    
+    // Handle object values with parent-child relationships
+    if (typeof option === 'object') {
+      // Format dropdown configuration objects with columnName and options
+      if (option.columnName && option.options !== undefined) {
+        if (option.parentColumn) {
+          return `${option.columnName} (dependent on ${option.parentColumn}: ${option.options.length} options)`;
+        }
+        
+        if (Array.isArray(option.options) && option.options.length === 0) {
+          return `${option.columnName}: No options`;
+        }
+        
+        if (Array.isArray(option.options) && option.options.length <= 3) {
+          const optValues = option.options.map((opt: any) => {
+            if (typeof opt === 'object' && opt.value) {
+              return opt.value + (opt.parent ? ` (${opt.parent})` : '');
+            }
+            return String(opt);
+          });
+          return `${option.columnName}: ${optValues.join(", ")}`;
+        }
+        
+        return `${option.columnName}: ${option.options.length} options`;
+      }
+      
+      // Handle standard value-parent objects
+      if (option.value !== undefined) {
+        if (option.parent) {
+          return `${option.value} (parent: ${option.parent})`;
+        }
+        return String(option.value);
+      }
+      
+      // For other objects, show a better representation than [object Object]
+      try {
+        return JSON.stringify(option);
+      } catch (e) {
+        return `Complex object`;
+      }
+    }
+    
+    return String(option);
+  };
+
   // Add this function to format JSON data in a more user-friendly way
   const formatJsonForDisplay = (jsonData: any): JSX.Element => {
     if (!jsonData) return <span className="text-gray-500 italic">No data available</span>;
+    
+    // Special handling for dropdown changes
+    if (jsonData.changes && (jsonData.changes.added?.length > 0 || jsonData.changes.removed?.length > 0)) {
+      return (
+        <div className="space-y-4">
+          <div className="font-medium text-gray-700">Dropdown Changes</div>
+          
+          {jsonData.changes.added?.length > 0 && (
+            <div className="pl-4 space-y-2">
+              <div className="font-medium text-green-600">Added Options ({jsonData.changes.added.length})</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-4">
+                {jsonData.changes.added.map((item: any, i: number) => (
+                  <div key={`added-${i}`} className="text-sm flex items-start gap-1">
+                    <span className="text-gray-600">{item.column}:</span>
+                    <span className="text-green-600 font-medium">{typeof item.value === 'object' ? JSON.stringify(item.value) : String(item.value)}</span>
+                    {item.parent_column && (
+                      <span className="text-gray-500">
+                        (parent: {item.parent_value || 'none'})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {jsonData.changes.removed?.length > 0 && (
+            <div className="pl-4 space-y-2">
+              <div className="font-medium text-red-600">Removed Options ({jsonData.changes.removed.length})</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-4">
+                {jsonData.changes.removed.map((item: any, i: number) => (
+                  <div key={`removed-${i}`} className="text-sm flex items-start gap-1">
+                    <span className="text-gray-600">{item.column}:</span>
+                    <span className="text-red-600 font-medium">{typeof item.value === 'object' ? JSON.stringify(item.value) : String(item.value)}</span>
+                    {item.parent_column && (
+                      <span className="text-gray-500">
+                        (parent: {item.parent_value || 'none'})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Existing handling for dropdown options
+    if (jsonData.dropdown_options && Array.isArray(jsonData.dropdown_options)) {
+      return (
+        <div className="space-y-4">
+          <div className="font-medium text-gray-700">Dropdown Configuration</div>
+          <div className="space-y-3 pl-4">
+            {jsonData.dropdown_options.map((option: any, index: number) => (
+              <div key={index} className="border-l-2 border-gray-200 pl-4 pb-3">
+                <div className="font-medium text-blue-600">
+                  {option.columnName} 
+                  {option.parentColumn && <span className="text-purple-600"> (depends on {option.parentColumn})</span>}
+                </div>
+                {Array.isArray(option.options) && option.options.length > 0 ? (
+                  <div>
+                    <div className="text-sm text-gray-600 mt-1 mb-2">{option.options.length} options:</div>
+                    <div className="grid grid-cols-2 gap-2 pl-2">
+                      {option.options.slice(0, 10).map((opt: any, i: number) => (
+                        <div key={i} className="text-sm">
+                          {typeof opt === 'object' && opt.value ? (
+                            <>
+                              <span className="text-green-600">{opt.value}</span>
+                              {opt.parent && <span className="text-gray-500"> ({opt.parent})</span>}
+                            </>
+                          ) : (
+                            <span>{String(opt)}</span>
+                          )}
+                        </div>
+                      ))}
+                      {option.options.length > 10 && (
+                        <div className="text-sm text-gray-500 col-span-2">
+                          ...and {option.options.length - 10} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 mt-1">No options configured</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    // Special handling for dependent and regular changes
+    if ((jsonData.dependent_changes && Object.keys(jsonData.dependent_changes).length > 0) ||
+        (jsonData.regular_changes && Object.keys(jsonData.regular_changes).length > 0)) {
+      
+      return (
+        <div className="space-y-6">
+          {/* Dependent dropdown changes */}
+          {jsonData.dependent_changes && Object.keys(jsonData.dependent_changes).length > 0 && (
+            <div className="space-y-3">
+              <div className="font-medium text-gray-700">Dependent Dropdown Changes</div>
+              <div className="space-y-4 pl-4">
+                {Object.entries(jsonData.dependent_changes).map(([column, changes]: [string, any], idx: number) => (
+                  <div key={`dep-${idx}`} className="border-l-2 border-gray-200 pl-4 space-y-2">
+                    <div className="font-medium text-blue-600">
+                      {column} <span className="text-purple-600">(depends on {changes.parent_column})</span>
+                    </div>
+                    
+                    {/* Added values */}
+                    {changes.added && changes.added.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-green-600">Added Options:</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 pl-3">
+                          {changes.added.map((item: any, i: number) => (
+                            <div key={i} className="text-sm">
+                              <span className="text-green-600">{item.value}</span>
+                              <span className="text-gray-500"> (parent: {item.parent})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Removed values */}
+                    {changes.removed && changes.removed.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-red-600">Removed Options:</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 pl-3">
+                          {changes.removed.map((item: any, i: number) => (
+                            <div key={i} className="text-sm">
+                              <span className="text-red-600">{item.value}</span>
+                              <span className="text-gray-500"> (parent: {item.parent})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Regular dropdown changes */}
+          {jsonData.regular_changes && Object.keys(jsonData.regular_changes).length > 0 && (
+            <div className="space-y-3">
+              <div className="font-medium text-gray-700">Regular Dropdown Changes</div>
+              <div className="space-y-4 pl-4">
+                {Object.entries(jsonData.regular_changes).map(([column, changes]: [string, any], idx: number) => (
+                  <div key={`reg-${idx}`} className="border-l-2 border-gray-200 pl-4 space-y-2">
+                    <div className="font-medium text-blue-600">{column}</div>
+                    
+                    {/* Added values */}
+                    {changes.added && changes.added.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-green-600">Added Options:</div>
+                        <div className="grid grid-cols-2 gap-2 pl-3">
+                          {changes.added.map((item: any, i: number) => (
+                            <div key={i} className="text-sm text-green-600">
+                              {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Removed values */}
+                    {changes.removed && changes.removed.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-red-600">Removed Options:</div>
+                        <div className="grid grid-cols-2 gap-2 pl-3">
+                          {changes.removed.map((item: any, i: number) => (
+                            <div key={i} className="text-sm text-red-600">
+                              {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
     
     // Handle different data types
     if (typeof jsonData === 'string') {

@@ -23,6 +23,14 @@ const logAdminAction = (actionType, section) => {
                     const adminId = req.user.user_id;
                     const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
                     
+                    // Skip logging certain GET requests that don't modify data
+                    if (section === 'COLUMN_PERMISSION' && 
+                        req.body.action === 'get' && 
+                        req.method === 'POST') {
+                        // Just call the original json function and return
+                        return res.json.apply(res, arguments);
+                    }
+                    
                     // Prepare action details
                     const actionDetails = {
                         requestBody: req.body,
@@ -36,18 +44,46 @@ const logAdminAction = (actionType, section) => {
                     // Try to determine the target table from request
                     if (req.body.table_name) {
                         targetTable = req.body.table_name;
+                    } else if (req.body.tableName) {
+                        targetTable = req.body.tableName;
+                    } else if (req.body.original_table_name) {
+                        targetTable = req.body.original_table_name;
                     } else if (section === 'USER_MANAGEMENT') {
                         targetTable = 'app.users';
                         targetId = req.body.user_id || req.params.id;
+                    } else if (section === 'DROPDOWN_MANAGEMENT' && req.params.tableName) {
+                        // Extract table name from URL parameters for dropdown management
+                        targetTable = req.params.tableName;
+                    } else if (section === 'VALIDATION_CONFIG' && req.params.tableName) {
+                        targetTable = req.params.tableName;
+                    } else if (section === 'COLUMN_RENAME') {
+                        targetTable = req.body.table_name || req.params.table_name;
+                    } else if (section === 'TABLE_CONFIG' && req.params.id) {
+                        // For table metadata updates by ID, extract the original table name
+                        targetTable = req.body.original_table_name;
                     } else if (req.originalUrl) {
                         // Extract from URL if possible
                         const urlParts = req.originalUrl.split('/');
                         if (urlParts.length > 2) {
-                            targetTable = urlParts[1];
+                            // Handle special case for API routes
+                            if (urlParts[1] === 'api' && urlParts[2] === 'admin') {
+                                if (urlParts[3] === 'dropdowns' && urlParts[4]) {
+                                    targetTable = urlParts[4]; // The table name is the 4th part of the URL
+                                } else if (urlParts[3] === 'validations' && urlParts[4]) {
+                                    targetTable = urlParts[4]; // The table name is the 4th part of the URL
+                                }
+                            } else {
+                                targetTable = urlParts[1];
+                            }
                             if (urlParts[2] && !urlParts[2].includes('?')) {
                                 targetId = urlParts[2];
                             }
                         }
+                    }
+                    
+                    // For tables that store their names differently
+                    if (section === 'COLUMN_RENAME' && !targetTable) {
+                        targetTable = req.body.table_name;
                     }
                     
                     // Determine if the action was successful
@@ -245,11 +281,16 @@ function extractValidationDetails(body) {
 }
 
 function extractDropdownDetails(body) {
+    // Handle both direct body properties and nested structures
     const details = {
-        table_name: body.table_name,
-        column_name: body.column_name,
+        table_name: body.table_name || body.tableName,
         dropdown_options: body.dropdown_options || {}
     };
+    
+    // For individual column updates
+    if (body.column_name) {
+        details.column_name = body.column_name;
+    }
     
     // For dependent dropdowns
     if (body.parent_column) {
@@ -257,13 +298,301 @@ function extractDropdownDetails(body) {
         details.parent_column = body.parent_column;
     }
     
+    // For bulk dropdown configurations with array structure
+    if (Array.isArray(body.dropdown_options)) {
+        // Organize dropdown options by type for better readability
+        details.is_dependent = false;
+        details.columns_updated = [];
+        details.regular_dropdowns = [];
+        details.dependent_dropdowns = [];
+        
+        body.dropdown_options.forEach(colConfig => {
+            if (colConfig.columnName) {
+                details.columns_updated.push(colConfig.columnName);
+                
+                if (colConfig.parentColumn) {
+                    details.is_dependent = true;
+                    
+                    // Format dependent dropdown options for better display
+                    const formattedValues = Array.isArray(colConfig.options) ? 
+                        colConfig.options.map(opt => {
+                            if (typeof opt === 'object' && opt.value) {
+                                return opt.parent ? 
+                                    `${opt.value} (parent: ${opt.parent})` : 
+                                    opt.value;
+                            }
+                            return opt;
+                        }) : [];
+                    
+                    details.dependent_dropdowns.push({
+                        column: colConfig.columnName,
+                        parent_column: colConfig.parentColumn,
+                        values: formattedValues
+                    });
+                } else {
+                    // Regular dropdown options
+                    details.regular_dropdowns.push({
+                        column: colConfig.columnName,
+                        values: colConfig.options || []
+                    });
+                }
+            }
+        });
+        
+        // Find regular dropdowns and dependent dropdowns
+        const regularOptions = body.dropdown_options.filter(opt => 
+            Array.isArray(opt.options) && 
+            (!opt.options[0] || typeof opt.options[0] !== 'object')
+        );
+        
+        const dependentOptions = body.dropdown_options.filter(opt => 
+            opt.parentColumn && Array.isArray(opt.options) && 
+            opt.options.length > 0 && typeof opt.options[0] === 'object'
+        );
+        
+        if (dependentOptions.length > 0) {
+            details.is_dependent = true;
+            details.dependent_columns = dependentOptions.map(opt => ({
+                column: opt.columnName,
+                parent: opt.parentColumn
+            }));
+        }
+    }
+    
     // If we're tracking changes between old and new dropdown options
     if (body.old_options && body.dropdown_options) {
-        const oldOptions = Array.isArray(body.old_options) ? body.old_options : Object.keys(body.old_options);
-        const newOptions = Array.isArray(body.dropdown_options) ? body.dropdown_options : Object.keys(body.dropdown_options);
+        // Track changes for each column
+        const regular_changes = {};
+        const dependent_changes = {};
+        const changes = { added: [], removed: [] };
         
-        details.added_options = newOptions.filter(o => !oldOptions.includes(o));
-        details.removed_options = oldOptions.filter(o => !newOptions.includes(o));
+        // Compare old and new dropdown configurations by column
+        if (Array.isArray(body.old_options) && Array.isArray(body.dropdown_options)) {
+            
+            // Process old dropdown options by column
+            const oldOptionsByColumn = {};
+            body.old_options.forEach(opt => {
+                if (opt.columnName) {
+                    oldOptionsByColumn[opt.columnName] = opt;
+                }
+            });
+            
+            // Process new dropdown options by column and compare
+            body.dropdown_options.forEach(newOpt => {
+                if (!newOpt.columnName) return;
+                
+                const oldOpt = oldOptionsByColumn[newOpt.columnName];
+                if (!oldOpt) {
+                    // This is a completely new column config
+                    if (newOpt.parentColumn) {
+                        // Dependent dropdown
+                        dependent_changes[newOpt.columnName] = {
+                            parent_column: newOpt.parentColumn,
+                            added: newOpt.options.map(o => {
+                                if (typeof o === 'object' && o.value) {
+                                    return { value: o.value, parent: o.parent };
+                                }
+                                return { value: o };
+                            }),
+                            removed: []
+                        };
+                        
+                        // Also track each option added in the changes array
+                        newOpt.options.forEach(o => {
+                            changes.added.push({
+                                column: newOpt.columnName,
+                                value: typeof o === 'object' ? o.value : o,
+                                parent_column: newOpt.parentColumn,
+                                parent_value: typeof o === 'object' ? o.parent : null
+                            });
+                        });
+                    } else {
+                        // Regular dropdown
+                        regular_changes[newOpt.columnName] = {
+                            added: [...newOpt.options],
+                            removed: []
+                        };
+                        
+                        // Track each option added
+                        newOpt.options.forEach(o => {
+                            changes.added.push({
+                                column: newOpt.columnName,
+                                value: o
+                            });
+                        });
+                    }
+                    return;
+                }
+                
+                // This column exists in both old and new configs
+                // Compare options to find additions and removals
+                if (newOpt.parentColumn) {
+                    // Handle dependent dropdown comparison
+                    const oldOptions = oldOpt.options || [];
+                    const newOptions = newOpt.options || [];
+                    
+                    // Extract values with their parents for comparison
+                    const oldValuesMap = new Map();
+                    oldOptions.forEach(o => {
+                        const key = typeof o === 'object' ? 
+                            `${o.value}:${o.parent || 'null'}` : 
+                            `${o}:null`;
+                        oldValuesMap.set(key, o);
+                    });
+                    
+                    const added = [];
+                    newOptions.forEach(o => {
+                        const key = typeof o === 'object' ? 
+                            `${o.value}:${o.parent || 'null'}` : 
+                            `${o}:null`;
+                        
+                        if (!oldValuesMap.has(key)) {
+                            added.push(typeof o === 'object' ? 
+                                { value: o.value, parent: o.parent } : 
+                                { value: o });
+                                
+                            // Also track in the changes array
+                            changes.added.push({
+                                column: newOpt.columnName,
+                                value: typeof o === 'object' ? o.value : o,
+                                parent_column: newOpt.parentColumn,
+                                parent_value: typeof o === 'object' ? o.parent : null
+                            });
+                        }
+                        
+                        // Remove this key so we can track what's left as removed
+                        oldValuesMap.delete(key);
+                    });
+                    
+                    // Remaining items in oldValuesMap were removed
+                    const removed = [];
+                    oldValuesMap.forEach((o, key) => {
+                        removed.push(typeof o === 'object' ? 
+                            { value: o.value, parent: o.parent } : 
+                            { value: o });
+                            
+                        // Track in the changes array
+                        changes.removed.push({
+                            column: newOpt.columnName,
+                            value: typeof o === 'object' ? o.value : o,
+                            parent_column: newOpt.parentColumn,
+                            parent_value: typeof o === 'object' ? o.parent : null
+                        });
+                    });
+                    
+                    // Only record changes if something actually changed
+                    if (added.length > 0 || removed.length > 0) {
+                        dependent_changes[newOpt.columnName] = {
+                            parent_column: newOpt.parentColumn,
+                            added,
+                            removed
+                        };
+                    }
+                } else {
+                    // Handle regular dropdown comparison
+                    const oldValues = new Set(oldOpt.options || []);
+                    const newValues = new Set(newOpt.options || []);
+                    
+                    const added = [];
+                    const removed = [];
+                    
+                    // Find added values
+                    newOpt.options.forEach(val => {
+                        if (!oldValues.has(val)) {
+                            added.push(val);
+                            
+                            // Track in changes array
+                            changes.added.push({
+                                column: newOpt.columnName,
+                                value: val
+                            });
+                        }
+                    });
+                    
+                    // Find removed values
+                    if (oldOpt.options) {
+                        oldOpt.options.forEach(val => {
+                            if (!newValues.has(val)) {
+                                removed.push(val);
+                                
+                                // Track in changes array
+                                changes.removed.push({
+                                    column: newOpt.columnName,
+                                    value: val
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Only record changes if something actually changed
+                    if (added.length > 0 || removed.length > 0) {
+                        regular_changes[newOpt.columnName] = {
+                            added,
+                            removed
+                        };
+                    }
+                }
+            });
+            
+            // Check for columns that were completely removed
+            Object.keys(oldOptionsByColumn).forEach(columnName => {
+                const oldOpt = oldOptionsByColumn[columnName];
+                const columnExists = body.dropdown_options.some(opt => opt.columnName === columnName);
+                
+                if (!columnExists) {
+                    // This column was completely removed
+                    if (oldOpt.parentColumn) {
+                        // It was a dependent dropdown
+                        dependent_changes[columnName] = {
+                            parent_column: oldOpt.parentColumn,
+                            added: [],
+                            removed: oldOpt.options.map(o => {
+                                if (typeof o === 'object' && o.value) {
+                                    return { value: o.value, parent: o.parent };
+                                }
+                                return { value: o };
+                            })
+                        };
+                        
+                        // Track each option removed
+                        oldOpt.options.forEach(o => {
+                            changes.removed.push({
+                                column: columnName,
+                                value: typeof o === 'object' ? o.value : o,
+                                parent_column: oldOpt.parentColumn,
+                                parent_value: typeof o === 'object' ? o.parent : null
+                            });
+                        });
+                    } else {
+                        // It was a regular dropdown
+                        regular_changes[columnName] = {
+                            added: [],
+                            removed: [...(oldOpt.options || [])]
+                        };
+                        
+                        // Track each option removed
+                        (oldOpt.options || []).forEach(o => {
+                            changes.removed.push({
+                                column: columnName,
+                                value: o
+                            });
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Add the detailed changes to the log details
+        if (Object.keys(regular_changes).length > 0) {
+            details.regular_changes = regular_changes;
+        }
+        
+        if (Object.keys(dependent_changes).length > 0) {
+            details.dependent_changes = dependent_changes;
+        }
+        
+        // Always include the changes array for compatibility
+        details.changes = changes;
     }
     
     return details;

@@ -1420,17 +1420,19 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
                       position="popper"
                       sideOffset={4}
                     >
-                      {columns
-                        .filter((col) => col !== selectedColumn)
-                        .map((column) => (
-                          <SelectItem
-                            key={column}
-                            value={column}
-                            className="hover:bg-gray-50"
-                          >
-                            {getDisplayName(column)}
-                          </SelectItem>
-                        ))}
+                      <div className="overflow-y-auto max-h-[200px] custom-scrollbar">
+                        {columns
+                          .filter((col) => col !== selectedColumn)
+                          .map((column) => (
+                            <SelectItem
+                              key={column}
+                              value={column}
+                              className="hover:bg-gray-50"
+                            >
+                              {getDisplayName(column)}
+                            </SelectItem>
+                          ))}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1459,30 +1461,32 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
                         position="popper"
                         sideOffset={4}
                       >
-                        {/* Add "All" and "Shared" options at the top */}
-                        <SelectItem
-                          key="__all__"
-                          value="__all__"
-                          className="hover:bg-gray-50 font-semibold border-b border-gray-100 mb-1 pb-1"
-                        >
-                          Show All Parent Values
-                        </SelectItem>
-                        <SelectItem
-                          key="__shared__"
-                          value="__shared__"
-                          className="hover:bg-gray-50 font-semibold border-b border-gray-100 mb-1 pb-1"
-                        >
-                          Manage Shared Options
-                        </SelectItem>
-                        {parentOptions.map((option) => (
+                        <div className="overflow-y-auto max-h-[200px] custom-scrollbar">
+                          {/* Add "All" and "Shared" options at the top */}
                           <SelectItem
-                            key={option}
-                            value={option}
-                            className="hover:bg-gray-50"
+                            key="__all__"
+                            value="__all__"
+                            className="hover:bg-gray-50 font-semibold border-b border-gray-100 mb-1 pb-1"
                           >
-                            {option}
+                            Show All Parent Values
                           </SelectItem>
-                        ))}
+                          <SelectItem
+                            key="__shared__"
+                            value="__shared__"
+                            className="hover:bg-gray-50 font-semibold border-b border-gray-100 mb-1 pb-1"
+                          >
+                            Manage Shared Options
+                          </SelectItem>
+                          {parentOptions.map((option) => (
+                            <SelectItem
+                              key={option}
+                              value={option}
+                              className="hover:bg-gray-50"
+                            >
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </div>
                       </SelectContent>
                     </Select>
                     {parentOptions.length === 0 && (

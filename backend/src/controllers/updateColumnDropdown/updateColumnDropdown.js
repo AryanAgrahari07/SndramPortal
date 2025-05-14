@@ -74,8 +74,12 @@ exports.updateColumnDropDown = async (req, res) => {
         const result = await client_update.query(queryCheckTable, [table_name]);
 
         if (result.rows.length > 0) {
-            // Table exists, update its dropdown_options
+            // Table exists, get existing dropdown_options for logging
             let existingOptions = result.rows[0].dropdown_options || [];
+            
+            // Add old_options to request body for logging middleware
+            req.body.old_options = existingOptions;
+            
             const rowId = result.rows[0].row_id;
 
             // Merge incoming dropdown_options into existingOptions
@@ -109,6 +113,9 @@ exports.updateColumnDropDown = async (req, res) => {
             ]);
         } else {
             // Table does not exist, insert new row
+            // No previous options to compare for logging
+            req.body.old_options = [];
+            
             const rowId = uuidv4();
             await client_update.query(queryInsert, [
                 table_name,

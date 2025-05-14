@@ -317,8 +317,13 @@ export const AdminHistory = () => {
     setSearchQuery("");
     setCustomDateRange({ from: "", to: "" });
     setCurrentPage(1);
+    setFilterParams(prev => ({
+      ...prev,
+      currentPage: 1,
+      sortColumn: null,
+      sortDirection: null
+    }));
     setRequests([]);
-    loadRequests();
   };
 
   const handlePageChange = (page: number) => {
@@ -328,6 +333,11 @@ export const AdminHistory = () => {
       currentPage: page
     }));
   };
+
+  // Update useEffect to trigger loadRequests when filterStatus changes
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests, filterStatus]);
 
   if (isLoading) {
     return (
@@ -629,11 +639,11 @@ export const AdminHistory = () => {
                   <TableCell>
                     {request.type === "add" ? (
                       <div className="flex items-center gap-1">
-                        <span>{request.checker_email}</span>
+                        <span>{request.checker_email || request.checker}</span>
                         <span className="text-xs text-gray-500">(Admin)</span>
                       </div>
                     ) : (
-                      request.checker_email
+                      request.checker_email || request.checker
                     )}
                   </TableCell>
                   <TableCell>
