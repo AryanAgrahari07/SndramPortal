@@ -106,6 +106,94 @@ exports.upsertValidationRule = async (req, res) => {
     const typeResult = await client_update.query(typeQuery, [table_name, column_name]);
     const data_type = typeResult.rows[0]?.data_type;
 
+    // Fetch existing validation rule for logging before/after changes
+    const existingRuleQuery = `
+      SELECT * FROM app.column_validations
+      WHERE table_name = $1 AND column_name = $2
+    `;
+    const existingRuleResult = await client_update.query(existingRuleQuery, [table_name, column_name]);
+    const existingRule = existingRuleResult.rows[0] || null;
+
+    // If existing rule found, add it to request for logging
+    if (existingRule) {
+      req.body.oldData = {
+        validation: existingRule,
+        validations: {
+          allow_numbers: existingRule.allow_numbers,
+          allow_special_chars: existingRule.allow_special_chars,
+          allow_spaces: existingRule.allow_spaces,
+          min_length: existingRule.min_length,
+          max_length: existingRule.max_length,
+          regex_pattern: existingRule.regex_pattern,
+          custom_error_message: existingRule.custom_error_message,
+          min_value: existingRule.min_value,
+          max_value: existingRule.max_value,
+          decimal_places: existingRule.decimal_places,
+          min_date: existingRule.min_date,
+          max_date: existingRule.max_date,
+          allow_weekends: existingRule.allow_weekends,
+          date_restriction: existingRule.date_restriction,
+          days_in_past: existingRule.days_in_past,
+          days_in_future: existingRule.days_in_future,
+          case_restriction: existingRule.case_restriction,
+          number_sign: existingRule.number_sign,
+          parity: existingRule.parity,
+          is_active: existingRule.is_active
+        }
+      };
+    }
+
+    // Prepare new data for logging
+    req.body.newData = {
+      validation: {
+        table_name,
+        column_name,
+        data_type,
+        allow_numbers,
+        allow_special_chars,
+        allow_spaces,
+        min_length,
+        max_length,
+        regex_pattern,
+        custom_error_message,
+        min_value,
+        max_value,
+        decimal_places,
+        min_date,
+        max_date,
+        allow_weekends,
+        is_active,
+        date_restriction,
+        days_in_past,
+        days_in_future,
+        case_restriction,
+        number_sign,
+        parity
+      },
+      validations: {
+        allow_numbers,
+        allow_special_chars,
+        allow_spaces,
+        min_length,
+        max_length,
+        regex_pattern,
+        custom_error_message,
+        min_value,
+        max_value,
+        decimal_places,
+        min_date,
+        max_date,
+        allow_weekends,
+        date_restriction,
+        days_in_past,
+        days_in_future,
+        case_restriction,
+        number_sign,
+        parity,
+        is_active
+      }
+    };
+
     // If date_restriction is 'custom', ensure days_in_past and days_in_future are handled correctly
     const finalDaysInPast = date_restriction === 'custom' ? days_in_past : null;
     const finalDaysInFuture = date_restriction === 'custom' ? days_in_future : null;
@@ -220,19 +308,64 @@ exports.deleteValidationRule = async (req, res) => {
   try {
     const { tableName, columnName } = req.params;
 
+    // Fetch existing validation rule for logging before deletion
+    const existingRuleQuery = `
+      SELECT * FROM app.column_validations
+      WHERE table_name = $1 AND column_name = $2
+    `;
+    const existingRuleResult = await client_update.query(existingRuleQuery, [tableName, columnName]);
+    const existingRule = existingRuleResult.rows[0];
+
+    if (!existingRule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Validation rule not found'
+      });
+    }
+
+    // Add to request for logging
+    req.body.oldData = {
+      validation: existingRule,
+      validations: {
+        allow_numbers: existingRule.allow_numbers,
+        allow_special_chars: existingRule.allow_special_chars,
+        allow_spaces: existingRule.allow_spaces,
+        min_length: existingRule.min_length,
+        max_length: existingRule.max_length,
+        regex_pattern: existingRule.regex_pattern,
+        custom_error_message: existingRule.custom_error_message,
+        min_value: existingRule.min_value,
+        max_value: existingRule.max_value,
+        decimal_places: existingRule.decimal_places,
+        min_date: existingRule.min_date,
+        max_date: existingRule.max_date,
+        allow_weekends: existingRule.allow_weekends,
+        date_restriction: existingRule.date_restriction,
+        days_in_past: existingRule.days_in_past,
+        days_in_future: existingRule.days_in_future,
+        case_restriction: existingRule.case_restriction,
+        number_sign: existingRule.number_sign,
+        parity: existingRule.parity,
+        is_active: existingRule.is_active
+      }
+    };
+
+    // An empty object for newData since we're deleting
+    req.body.newData = { 
+      validation: null,
+      validations: {}
+    };
+
+    // Add table name and column name to request body for logging
+    req.body.table_name = tableName;
+    req.body.column_name = columnName;
+
     const query = `
       DELETE FROM app.column_validations 
       WHERE table_name = $1 AND column_name = $2
       RETURNING *
     `;
     const result = await client_update.query(query, [tableName, columnName]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Validation rule not found'
-      });
-    }
 
     res.json({
       success: true,
@@ -253,6 +386,82 @@ exports.toggleValidationRule = async (req, res) => {
   try {
     const { tableName, columnName } = req.params;
     const { is_active } = req.body;
+
+    // Fetch existing validation rule for logging before toggling
+    const existingRuleQuery = `
+      SELECT * FROM app.column_validations
+      WHERE table_name = $1 AND column_name = $2
+    `;
+    const existingRuleResult = await client_update.query(existingRuleQuery, [tableName, columnName]);
+    const existingRule = existingRuleResult.rows[0];
+
+    if (!existingRule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Validation rule not found'
+      });
+    }
+
+    // Add to request for logging
+    req.body.oldData = {
+      validation: existingRule,
+      validations: {
+        allow_numbers: existingRule.allow_numbers,
+        allow_special_chars: existingRule.allow_special_chars,
+        allow_spaces: existingRule.allow_spaces,
+        min_length: existingRule.min_length,
+        max_length: existingRule.max_length,
+        regex_pattern: existingRule.regex_pattern,
+        custom_error_message: existingRule.custom_error_message,
+        min_value: existingRule.min_value,
+        max_value: existingRule.max_value,
+        decimal_places: existingRule.decimal_places,
+        min_date: existingRule.min_date,
+        max_date: existingRule.max_date,
+        allow_weekends: existingRule.allow_weekends,
+        date_restriction: existingRule.date_restriction,
+        days_in_past: existingRule.days_in_past,
+        days_in_future: existingRule.days_in_future,
+        case_restriction: existingRule.case_restriction,
+        number_sign: existingRule.number_sign,
+        parity: existingRule.parity,
+        is_active: existingRule.is_active
+      }
+    };
+
+    // Create newData with updated is_active value
+    req.body.newData = {
+      validation: {
+        ...existingRule,
+        is_active: is_active
+      },
+      validations: {
+        allow_numbers: existingRule.allow_numbers,
+        allow_special_chars: existingRule.allow_special_chars,
+        allow_spaces: existingRule.allow_spaces,
+        min_length: existingRule.min_length,
+        max_length: existingRule.max_length,
+        regex_pattern: existingRule.regex_pattern,
+        custom_error_message: existingRule.custom_error_message,
+        min_value: existingRule.min_value,
+        max_value: existingRule.max_value,
+        decimal_places: existingRule.decimal_places,
+        min_date: existingRule.min_date,
+        max_date: existingRule.max_date,
+        allow_weekends: existingRule.allow_weekends,
+        date_restriction: existingRule.date_restriction,
+        days_in_past: existingRule.days_in_past,
+        days_in_future: existingRule.days_in_future,
+        case_restriction: existingRule.case_restriction,
+        number_sign: existingRule.number_sign,
+        parity: existingRule.parity,
+        is_active: is_active
+      }
+    };
+
+    // Add table name and column name to request body for logging
+    req.body.table_name = tableName;
+    req.body.column_name = columnName;
 
     const query = `
       UPDATE app.column_validations 

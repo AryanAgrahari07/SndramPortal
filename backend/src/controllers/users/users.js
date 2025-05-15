@@ -145,6 +145,23 @@ exports.updateUser = async (req, res) => {
   const { email, role, first_name, last_name } = req.body;
 
   try {
+    // First, get the current user data before making any changes
+    const getUserQuery = `
+      SELECT user_id, email, role, first_name, last_name, active, created_at, updated_at
+      FROM app.users
+      WHERE user_id = $1;
+    `;
+    const currentUserResult = await client_update.query(getUserQuery, [id]);
+    
+    if (currentUserResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    
+    const previousData = currentUserResult.rows[0];
+    
     let updateFields = [];
     let values = [];
     let valueIndex = 1;
@@ -191,11 +208,11 @@ exports.updateUser = async (req, res) => {
     updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
 
     const query = `
-            UPDATE app.users
-            SET ${updateFields.join(", ")}
-            WHERE user_id = $${valueIndex}
-            RETURNING user_id, email, role, first_name, last_name, created_at, updated_at;
-        `;
+      UPDATE app.users
+      SET ${updateFields.join(", ")}
+      WHERE user_id = $${valueIndex}
+      RETURNING user_id, email, role, first_name, last_name, active, created_at, updated_at;
+    `;
 
     values.push(id);
     const result = await client_update.query(query, values);
@@ -207,10 +224,50 @@ exports.updateUser = async (req, res) => {
       });
     }
 
+    const currentData = result.rows[0];
+    
+    // Generate changes array for logging
+    const changes = [];
+    if (previousData.email !== currentData.email) {
+      changes.push({
+        field: 'email',
+        oldValue: previousData.email,
+        newValue: currentData.email
+      });
+    }
+    
+    if (previousData.role !== currentData.role) {
+      changes.push({
+        field: 'role',
+        oldValue: previousData.role,
+        newValue: currentData.role
+      });
+    }
+    
+    if (previousData.first_name !== currentData.first_name) {
+      changes.push({
+        field: 'first_name',
+        oldValue: previousData.first_name,
+        newValue: currentData.first_name
+      });
+    }
+    
+    if (previousData.last_name !== currentData.last_name) {
+      changes.push({
+        field: 'last_name',
+        oldValue: previousData.last_name,
+        newValue: currentData.last_name
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "User updated successfully",
-      data: result.rows[0],
+      data: {
+        current: currentData,
+        previous: previousData,
+        changes: changes
+      }
     });
   } catch (error) {
     console.error("Error updating user:", error);

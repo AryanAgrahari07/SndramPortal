@@ -41,10 +41,20 @@ exports.ColumnPermission = async (req, res) => {
             WHERE table_name = $1;
         `;
         const checkResult = await client_update.query(checkQuery, [table_name]);
+        
+        // Store original column list for logging
+        const existingColumnList = checkResult.rowCount > 0 ? checkResult.rows[0].column_list || [] : [];
+        
+        // Add oldData to request for logging middleware
+        req.body.oldData = {
+            table_name,
+            column_list: existingColumnList
+        };
+        
+        let updatedColumnList = [];
 
         if (checkResult.rowCount > 0) {
-            const existingColumnList = checkResult.rows[0].column_list || [];
-            const updatedColumnList = existingColumnList.map((existingColumn) => {
+            updatedColumnList = existingColumnList.map((existingColumn) => {
                 const match = column_list.find(col => col.column_name === existingColumn.column_name);
                 return match ? { ...existingColumn, column_status: match.column_status } : existingColumn;
             });
@@ -65,12 +75,19 @@ exports.ColumnPermission = async (req, res) => {
             await client_update.query(updateQuery, [JSON.stringify(updatedColumnList), table_name]);
         } else {
             // Row does not exist, insert a new row
+            updatedColumnList = column_list;
             const insertQuery = `
                 INSERT INTO app.column_permission (table_name, column_list, created_at, updated_at)
                 VALUES ($1, $2, NOW(), NOW());
             `;
             await client_update.query(insertQuery, [table_name, JSON.stringify(column_list)]);
         }
+        
+        // Add newData to request for logging middleware
+        req.body.newData = {
+            table_name,
+            column_list: updatedColumnList
+        };
 
         await client_update.query('COMMIT');
 

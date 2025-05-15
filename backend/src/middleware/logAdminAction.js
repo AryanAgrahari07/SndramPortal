@@ -14,6 +14,9 @@ const logAdminAction = (actionType, section) => {
         
         // Override the json function to capture response data
         res.json = async function(data) {
+            // Store response data for use in extract functions
+            req.responseData = data;
+            
             // Restore the original json function
             res.json = originalJson;
             
@@ -86,34 +89,40 @@ const logAdminAction = (actionType, section) => {
                         targetTable = req.body.table_name;
                     }
                     
-                    // Determine if the action was successful
-                    const status = data.success === false ? 'failed' : 'completed';
-                    
-                    // Extract old and new data if available
-                    if (req.body.oldData) {
+                    // Check if we have the new data structure with previous/current data
+                    if (data && data.data && data.data.previous && data.data.current) {
+                        // Extract old and new data from the new structure
+                        actionDetails.oldData = data.data.previous;
+                        actionDetails.newData = data.data.current;
+                    }
+                    // Fallback to old structure if available
+                    else if (req.body.oldData) {
                         actionDetails.oldData = req.body.oldData;
                     }
                     
-                    if (req.body.newData) {
+                    if (req.body.newData && !actionDetails.newData) {
                         actionDetails.newData = req.body.newData;
                     }
+                    
+                    // Determine if the action was successful
+                    const status = data.success === false ? 'failed' : 'completed';
                     
                     // For user management, enhance details
                     let additionalInfo = null;
                     if (section === 'USER_MANAGEMENT') {
-                        additionalInfo = extractUserDetails(req.body, actionType);
+                        additionalInfo = extractUserDetails(req.body, actionType, req);
                     } else if (section === 'GROUP_MANAGEMENT') {
-                        additionalInfo = extractGroupDetails(req.body, actionType);
+                        additionalInfo = extractGroupDetails(req.body, actionType, req);
                     } else if (section === 'COLUMN_PERMISSION') {
-                        additionalInfo = extractColumnPermissionDetails(req.body);
+                        additionalInfo = extractColumnPermissionDetails(req.body, actionType, req);
                     } else if (section === 'VALIDATION_CONFIG') {
-                        additionalInfo = extractValidationDetails(req.body);
+                        additionalInfo = extractValidationDetails(req.body, actionType, req);
                     } else if (section === 'DROPDOWN_MANAGEMENT') {
-                        additionalInfo = extractDropdownDetails(req.body);
+                        additionalInfo = extractDropdownDetails(req.body, actionType, req);
                     } else if (section === 'COLUMN_RENAME') {
-                        additionalInfo = extractColumnRenameDetails(req.body);
+                        additionalInfo = extractColumnRenameDetails(req.body, actionType, req);
                     } else if (section === 'TABLE_CONFIG') {
-                        additionalInfo = extractTableConfigDetails(req.body, actionType);
+                        additionalInfo = extractTableConfigDetails(req.body, actionType, req);
                     }
                     
                     // Insert log into database
@@ -153,8 +162,9 @@ const logAdminAction = (actionType, section) => {
 
 // Helper functions to extract detailed information
 
-function extractUserDetails(body, actionType) {
+function extractUserDetails(body, actionType, req) {
     const details = {};
+    const response = req.responseData || {};
     
     if (actionType === 'CREATE') {
         details.email = body.email;
@@ -162,12 +172,52 @@ function extractUserDetails(body, actionType) {
         details.last_name = body.last_name;
         details.role = body.role;
     } else if (actionType === 'UPDATE') {
-        // For user activation/deactivation
-        if (body.active !== undefined) {
+        // Check for the new data structure that includes previous and current data
+        const responseData = response?.data || {};
+        
+        if (responseData.previous && responseData.current) {
+            // New format - with previous/current data and changes array
+            details.email = responseData.current.email || body.email;
+            details.user_id = responseData.current.user_id || body.user_id || body.id;
+            
+            // Check for activation/deactivation
+            if (responseData.previous.active !== responseData.current.active) {
+                if (responseData.current.active) {
+                    details.action = 'User Activated';
+                } else {
+                    details.action = 'User Deactivated';
+                }
+            }
+            
+            // Include the changes array if available
+            if (responseData.changes && Array.isArray(responseData.changes)) {
+                details.changes = responseData.changes;
+            } else {
+                // Create changes array manually if not provided
+                details.changes = [];
+                
+                // Compare fields
+                const compareFields = ['email', 'role', 'first_name', 'last_name', 'active'];
+                compareFields.forEach(field => {
+                    if (responseData.previous[field] !== responseData.current[field]) {
+                        details.changes.push({
+                            field,
+                            oldValue: responseData.previous[field],
+                            newValue: responseData.current[field]
+                        });
+                    }
+                });
+            }
+        } 
+        // For user activation/deactivation using the old format
+        else if (body.active !== undefined) {
             details.action = body.active ? 'User Activated' : 'User Deactivated';
             details.email = body.email;
-        } else {
+        } 
+        // For general user updates using the old format
+        else {
             // For general user updates
+            details.email = body.email;
             details.user_id = body.user_id || body.id;
             
             // Include changed fields
@@ -177,27 +227,13 @@ function extractUserDetails(body, actionType) {
                     details[field] = body[field];
                 }
             });
-            
-            // Include before/after comparison if available
-            if (body.oldData && body.newData) {
-                details.changes = [];
-                fields.forEach(field => {
-                    if (body.oldData[field] !== body.newData[field]) {
-                        details.changes.push({
-                            field,
-                            oldValue: body.oldData[field],
-                            newValue: body.newData[field]
-                        });
-                    }
-                });
-            }
         }
     }
     
     return details;
 }
 
-function extractGroupDetails(body, actionType) {
+function extractGroupDetails(body, actionType, req) {
     const details = {};
     
     if (actionType === 'CREATE') {
@@ -233,7 +269,7 @@ function extractGroupDetails(body, actionType) {
     return details;
 }
 
-function extractColumnPermissionDetails(body) {
+function extractColumnPermissionDetails(body, actionType, req) {
     const details = {
         table_name: body.table_name,
         columns: []
@@ -255,12 +291,13 @@ function extractColumnPermissionDetails(body) {
     return details;
 }
 
-function extractValidationDetails(body) {
+function extractValidationDetails(body, actionType, req) {
     const details = {
         table_name: body.table_name || body.tableName,
         column_name: body.column_name || body.columnName
     };
     
+    // Add current validation configuration
     if (body.validation) {
         details.validations = body.validation;
     } else if (body.validations) {
@@ -277,10 +314,41 @@ function extractValidationDetails(body) {
         details.is_active = body.is_active;
     }
     
+    // Track changes between old and new data if available
+    if (body.oldData && body.newData) {
+        // Extract old and new validation settings
+        const oldValidations = body.oldData.validation || body.oldData.validations || {};
+        const newValidations = body.newData.validation || body.newData.validations || {};
+        
+        // Find added, removed, and modified validation rules
+        details.added_validations = [];
+        details.removed_validations = [];
+        details.modified_validations = [];
+        
+        // Find added and modified validation rules
+        Object.keys(newValidations).forEach(key => {
+            // Check if the key exists in old data
+            if (!(key in oldValidations)) {
+                details.added_validations.push(key);
+            } 
+            // If it exists, check if the value changed
+            else if (oldValidations[key] !== newValidations[key]) {
+                details.modified_validations.push(key);
+            }
+        });
+        
+        // Find removed validation rules
+        Object.keys(oldValidations).forEach(key => {
+            if (!(key in newValidations)) {
+                details.removed_validations.push(key);
+            }
+        });
+    }
+    
     return details;
 }
 
-function extractDropdownDetails(body) {
+function extractDropdownDetails(body, actionType, req) {
     // Handle both direct body properties and nested structures
     const details = {
         table_name: body.table_name || body.tableName,
@@ -598,7 +666,17 @@ function extractDropdownDetails(body) {
     return details;
 }
 
-function extractColumnRenameDetails(body) {
+function extractColumnRenameDetails(body, actionType, req) {
+    // For DELETE operations, we need to get data from params
+    if (actionType === 'DELETE' && req && req.params) {
+        return {
+            table_name: req.params.table_name,
+            original_column_name: req.params.column_name,
+            renamed_column_name: ''  // No renamed column name for delete operations
+        };
+    }
+    
+    // For CREATE/UPDATE operations, data comes from body
     return {
         table_name: body.table_name,
         original_column_name: body.original_column_name,
@@ -606,7 +684,7 @@ function extractColumnRenameDetails(body) {
     };
 }
 
-function extractTableConfigDetails(body, actionType) {
+function extractTableConfigDetails(body, actionType, req) {
     const details = {
         original_table_name: body.original_table_name,
         display_name: body.display_name
