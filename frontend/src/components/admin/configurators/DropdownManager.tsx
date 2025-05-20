@@ -914,7 +914,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     return options.filter((opt) => opt.parent === null);
   };
 
-  // Add CSV template download function
+  // Add CSV template download function for dependent dropdowns
   const handleExportTemplate = () => {
     if (!selectedTable || !selectedColumn || !isDependentDropdown || !parentColumn) {
       toast({
@@ -943,7 +943,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     });
   };
 
-  // Add CSV upload handler
+  // Add CSV upload handler for dependent dropdowns
   const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1284,6 +1284,231 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
             setShowErrors(true);
           }
         }
+      }
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Add new function for regular dropdown template download
+  const handleExportRegularTemplate = () => {
+    if (!selectedTable || !selectedColumn) {
+      toast({
+        title: "Error",
+        description: "Please select a table and column first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create CSV content with headers
+    const headers = ["option_value"];
+    const csvContent = headers.join(',') + '\n';
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${selectedTable}_${selectedColumn}_options_template.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
+    toast({
+      title: "Success",
+      description: "Template downloaded successfully",
+    });
+  };
+
+  // Add new function for regular dropdown CSV upload
+  const handleRegularCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!selectedTable || !selectedColumn) {
+      toast({
+        title: "Error",
+        description: "Please select a table and column first",
+        variant: "destructive",
+      });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setIsUploading(true);
+    setCSVErrors([]);
+    setShowErrors(true);
+
+    try {
+      // Validate file type
+      if (!file.type && !file.name.endsWith(".csv")) {
+        throw new Error("Please upload a valid CSV file");
+      }
+
+      // Parse CSV file
+      const results = await new Promise<Papa.ParseResult<Record<string, any>>>(
+        (resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: resolve,
+            error: reject,
+            transformHeader: (header) => header.trim(),
+          });
+        }
+      );
+
+      // Validate headers
+      const requiredHeaders = ["option_value"];
+      const csvHeaders = Object.keys(results.data[0] || {}).map((header) =>
+        header.trim().toLowerCase()
+      );
+      
+      const missingHeaders = requiredHeaders.filter(
+        (header) => !csvHeaders.includes(header.toLowerCase())
+      );
+
+      if (missingHeaders.length > 0) {
+        throw new Error(`Missing required columns: ${missingHeaders.join(", ")}`);
+      }
+
+      // Validate data and track invalid rows
+      const validationErrors: CSVValidationError[] = [];
+      const validOptions: string[] = [];
+      
+      // Process each row sequentially with validation
+      for (let index = 0; index < results.data.length; index++) {
+        const row = results.data[index];
+        const rowNum = index + 2; // +2 because row 1 is headers
+        let rowValid = true;
+        
+        // Check for empty option_value
+        if (!row.option_value || !row.option_value.trim()) {
+          validationErrors.push({
+            row: rowNum,
+            column: "option_value",
+            message: "Option value cannot be empty",
+          });
+          rowValid = false;
+        } else {
+          // Validate option_value against validation rules
+          const sanitizedValue = sanitizeInput(String(row.option_value).trim());
+          const validation = await validateDropdownValue(sanitizedValue);
+          
+          if (!validation.isValid) {
+            validationErrors.push({
+              row: rowNum,
+              column: "option_value",
+              message: validation.error || "Value does not meet validation requirements",
+            });
+            rowValid = false;
+          }
+        }
+        
+        // If row is valid, add to valid options array
+        if (rowValid) {
+          validOptions.push(sanitizeInput(String(row.option_value).trim()));
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        setCSVErrors(validationErrors);
+        if (validOptions.length === 0) {
+          setIsUploading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+          return; // Stop here if there are no valid options
+        }
+        
+        // Continue with valid options but show errors for invalid ones
+        toast({
+          title: "Warning",
+          description: `Skipping ${validationErrors.length} invalid rows. Processing ${validOptions.length} valid rows.`,
+          variant: "destructive",
+        });
+      }
+      
+      // Skip empty data
+      if (validOptions.length === 0) {
+        toast({
+          title: "Error",
+          description: "No valid data found in the CSV file",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+
+      // Remove duplicates within the CSV data
+      const uniqueOptions = Array.from(new Set(validOptions.map(o => o.toLowerCase())))
+        .map(lower => {
+          // Find the original casing for this option
+          return validOptions.find(o => o.toLowerCase() === lower) || lower;
+        });
+      
+      const duplicatesCount = validOptions.length - uniqueOptions.length;
+      if (duplicatesCount > 0) {
+        toast({
+          title: "Info",
+          description: `Skipping ${duplicatesCount} duplicate entries in CSV`,
+        });
+      }
+      
+      // Check for existing options to avoid duplicates
+      const existingOptionsLower = options.map(o => o.value.toLowerCase());
+      const newOptions = uniqueOptions.filter(o => !existingOptionsLower.includes(o.toLowerCase()));
+      const skippedCount = uniqueOptions.length - newOptions.length;
+      
+      if (skippedCount > 0) {
+        toast({
+          title: "Info",
+          description: `Skipping ${skippedCount} options that already exist in the dropdown`,
+        });
+      }
+      
+      // Add new options to the existing options
+      if (newOptions.length > 0) {
+        const updatedOptions = [
+          ...options, 
+          ...newOptions.map(value => ({ value, parent: null }))
+        ];
+        setOptions(updatedOptions);
+        
+        toast({
+          title: "Success",
+          description: `Added ${newOptions.length} new options to the dropdown`,
+        });
+      } else {
+        toast({
+          title: "Info",
+          description: "No new options to add - all options already exist in the dropdown",
+        });
+      }
+      
+    } catch (error) {
+      console.error("CSV upload error:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process CSV file",
+        variant: "destructive",
+      });
+      
+      // Add error to CSV errors if it's a specific validation error
+      if (error instanceof Error && error.message) {
+        setCSVErrors(prev => [...prev, {
+          row: 0,
+          column: "option_value",
+          message: error.message
+        }]);
+        setShowErrors(true);
       }
     } finally {
       setIsUploading(false);
@@ -1666,6 +1891,55 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
                   </Button>
                 )}
               </div>
+
+              {/* Regular dropdown bulk upload section */}
+              {!isDependentDropdown && (
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <div className="flex flex-col gap-4">
+                    <h4 className="text-sm font-medium text-gray-700">Bulk Options Management</h4>
+                    
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleExportRegularTemplate}
+                        className="bg-[#00bfa5]/10 border border-[#00bfa5]/20 hover:bg-[#00bfa5]/20 text-gray-700 flex items-center gap-2"
+                      >
+                        <Download className="h-4 w-4 text-[#00bfa5]" />
+                        Download Template
+                      </Button>
+                      
+                      <div>
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleRegularCSVUpload}
+                          ref={fileInputRef}
+                          className="hidden"
+                          id="csv-regular-dropdown-upload"
+                        />
+                        <label
+                          htmlFor="csv-regular-dropdown-upload"
+                          className={`inline-flex items-center gap-2 px-4 py-2 rounded-md 
+                          ${isUploading
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-[#0F172A] text-white hover:bg-[#0F172A]/90 cursor-pointer"
+                          }
+                          font-medium text-sm`}
+                        >
+                          <Upload
+                            className={`h-4 w-4 ${isUploading ? "text-gray-400" : "text-white"}`}
+                          />
+                          {isUploading ? "Uploading..." : "Upload CSV"}
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-gray-500">
+                      Use the template to bulk upload options for this dropdown. 
+                      Format: <span className="font-mono bg-gray-100 px-1 rounded">option_value</span>
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Instructions and status messages */}
               {isDependentDropdown && (
