@@ -794,7 +794,7 @@ const ValidationConfigurator: React.FC = () => {
 
                 {/* Save Button */}
                 <Button
-                  className="w-full mt-6"
+                  className="w-full mt-6 bg-[#003087] text-white hover:bg-[#002066]"
                   onClick={handleSave}
                   disabled={isLoading}
                 >

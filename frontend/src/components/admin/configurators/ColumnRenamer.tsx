@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { EXCLUDED_TABLES } from '@/config/tableConfig';
-
+import { Pagination } from '@/components/Pagination';
 
 interface TableColumn {
   column_name: string;
@@ -17,6 +17,10 @@ const ColumnRenamer = () => {
   const [editingColumn, setEditingColumn] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
 
   const handleEditSubmit = async (columnName: string) => {
     if (editValue.trim()) {
@@ -37,6 +41,17 @@ const ColumnRenamer = () => {
       fetchColumns();
     }
   }, [selectedTable]);
+
+  // Calculate total pages when columns or page size changes
+  useEffect(() => {
+    if (columns.length > 0) {
+      setTotalPages(Math.ceil(columns.length / pageSize));
+      // Reset to first page when table changes
+      setCurrentPage(1);
+    } else {
+      setTotalPages(1);
+    }
+  }, [columns, pageSize]);
 
   const fetchTables = async () => {
     try {
@@ -160,6 +175,24 @@ const ColumnRenamer = () => {
     }
   };
 
+  // Get the current page's data
+  const getCurrentPageData = () => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return columns.slice(startIndex, endIndex);
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Handle page size change
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -192,94 +225,125 @@ const ColumnRenamer = () => {
           {loading ? (
             <div>Loading...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Original Column Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Renamed Column Name
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {columns.map((column) => (
-                   <tr key={column.column_name}>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                     {column.column_name}
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap">
-            {editingColumn === column.column_name ? (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded-md shadow-sm p-2 w-full"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => handleEditSubmit(column.column_name)}
-                  onKeyUp={(e) => {
-                    console.log("key pressed", e.key);
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleEditSubmit(column.column_name);
-                    }
-                  }}
-                  autoFocus
-                  onFocus={() => console.log('Input focused')}
+            <div className="flex flex-col">
+              <div className="overflow-auto max-h-[500px] border border-gray-200 rounded-md">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Original Column Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Renamed Column Name
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getCurrentPageData().map((column) => (
+                     <tr key={column.column_name}>
+                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                         {column.column_name}
+                       </td>
+                       <td className="px-6 py-4 whitespace-nowrap">
+                        {editingColumn === column.column_name ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              className="border border-gray-300 rounded-md shadow-sm p-2 w-full"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={() => handleEditSubmit(column.column_name)}
+                              onKeyUp={(e) => {
+                                console.log("key pressed", e.key);
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleEditSubmit(column.column_name);
+                                }
+                              }}
+                              autoFocus
+                              onFocus={() => console.log('Input focused')}
+                            />
+                          </div>
+                        ) : column.renamed_column_name ? (
+                          <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-900">{column.renamed_column_name}</span>
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => {
+                                setEditingColumn(column.column_name);
+                                setEditValue(column.renamed_column_name || '');
+                              }}
+                              className="text-gray-400 hover:text-gray-600"
+                              title="Edit rename"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteRename(column.column_name)}
+                              className="text-red-400 hover:text-red-600"
+                              title="Delete rename"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        ) : (
+                          <input
+                          type="text"
+                          className="border border-gray-300 rounded-md shadow-sm p-2 w-full"
+                          placeholder="Enter new column name"
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyUp={(e) => {
+                            console.log("key pressed", e.key);
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleEditSubmit(column.column_name);
+                            }
+                          }}
+                          onBlur={(e) => handleRename(column.column_name, e.target.value)}
+                        />
+                      )}
+                    </td>
+                     </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination Controls */}
+              <div className="mt-4 flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[#1a237e]">Rows per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                      className="px-2 py-1 border border-[#e3f2fd] rounded-lg text-sm text-[#1a237e] focus:outline-none focus:ring-2 focus:ring-[#00bfa5] focus:border-transparent"
+                    >
+                      {[10, 25, 50, 100].map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-sm text-[#1a237e]">
+                    Total: {columns.length} records
+                  </span>
+                </div>
+
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
                 />
               </div>
-            ) : column.renamed_column_name ? (
-              <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-900">{column.renamed_column_name}</span>
-              <div className="flex space-x-2">
-                <button 
-                  onClick={() => {
-                    setEditingColumn(column.column_name);
-                    setEditValue(column.renamed_column_name || '');
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                  title="Edit rename"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => handleDeleteRename(column.column_name)}
-                  className="text-red-400 hover:text-red-600"
-                  title="Delete rename"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            ) : (
-              <input
-              type="text"
-              className="border border-gray-300 rounded-md shadow-sm p-2 w-full"
-              placeholder="Enter new column name"
-              onChange={(e) => setEditValue(e.target.value)}
-              onKeyUp={(e) => {
-                console.log("key pressed", e.key);
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleEditSubmit(column.column_name);
-                }
-              }}
-              onBlur={(e) => handleRename(column.column_name, e.target.value)}
-            />
-          )}
-        </td>
-                 </tr>
-                  ))}
-                </tbody>
-                </table>
             </div>
           )}
         </div>

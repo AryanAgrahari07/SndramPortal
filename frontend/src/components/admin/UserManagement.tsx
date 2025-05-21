@@ -543,44 +543,55 @@ const UserManagement: React.FC = () => {
               <DialogTitle className="text-xl font-semibold">
                 Create New User
               </DialogTitle>
-              <DialogDescription>
-                Fill in the user details below. All fields are required.
-              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4">
+            <form onSubmit={handleCreateUser} className="space-y-4 mt-2">
+              <div className="bg-blue-50 p-3 rounded-md mb-4">
+                <p className="text-sm text-blue-700">
+                  Fill in the user details below. All fields are required.
+                </p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-poppins">
-                {renderFormInput(
-                  "firstName",
-                  "First Name",
-                  "text",
-                  newUser.firstName,
-                  (e) =>
-                    setNewUser((prev) => ({
-                      ...prev,
-                      firstName: e.target.value,
-                    }))
-                )}
-                {renderFormInput(
-                  "lastName",
-                  "Last Name",
-                  "text",
-                  newUser.lastName,
-                  (e) =>
-                    setNewUser((prev) => ({
-                      ...prev,
-                      lastName: e.target.value,
-                    }))
-                )}
-                {renderFormInput(
-                  "email",
-                  "Email",
-                  "email",
-                  newUser.email,
-                  (e) =>
-                    setNewUser((prev) => ({ ...prev, email: e.target.value }))
-                )}
-
                 <div className="space-y-2">
+                  <label htmlFor="firstName" className="text-sm font-medium text-gray-700">First Name</label>
+                  {renderFormInput(
+                    "firstName",
+                    "First Name",
+                    "text",
+                    newUser.firstName,
+                    (e) =>
+                      setNewUser((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="lastName" className="text-sm font-medium text-gray-700">Last Name</label>
+                  {renderFormInput(
+                    "lastName",
+                    "Last Name",
+                    "text",
+                    newUser.lastName,
+                    (e) =>
+                      setNewUser((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
+                  {renderFormInput(
+                    "email",
+                    "Email",
+                    "email",
+                    newUser.email,
+                    (e) =>
+                      setNewUser((prev) => ({ ...prev, email: e.target.value }))
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="role" className="text-sm font-medium text-gray-700">Role</label>
                   <Select
                     value={newUser.role}
                     onValueChange={(value: "maker" | "checker" | "admin") =>
@@ -598,15 +609,18 @@ const UserManagement: React.FC = () => {
                   </Select>
                 </div>
               </div>
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t border-gray-100 mt-6">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setDialogOpen(false)}
+                  className="border-gray-300"
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Create User</Button>
+                <Button type="submit" className="bg-[#003087] text-white hover:bg-[#002066]">
+                  Create User
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -734,7 +748,7 @@ const UserManagement: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button onClick={handleUpdateUser} className="font-poppins">
+            <Button onClick={handleUpdateUser} className="font-poppins bg-[#003087] text-white hover:bg-[#002066]">
               Save Changes
             </Button>
           </DialogFooter>
