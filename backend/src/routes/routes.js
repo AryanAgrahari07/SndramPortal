@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { verifyToken, authorize } = require("../middleware/auth.js");
 const logAdminAction = require("../middleware/logAdminAction.js");
+const tableAccessControl = require("../middleware/tableAccessControl.js");
 
 const otpRequestLimiter = require("../middleware/otpRequestLimiter");
 // Import controllers
@@ -145,7 +146,9 @@ router.post("/mark-notifications-seen", verifyToken, markNotificationsAsSeen);
 router.post("/users/emails", verifyToken, getUserEmails);
 
 // table data routes
-router.get("/api/tabledata/:tableName", verifyToken, getTableData);
+router.get("/api/tabledata/:tableName", verifyToken, tableAccessControl, getTableData);
+router.get("/table", verifyToken, table);
+router.get("/tableData/:name", verifyToken, tableAccessControl, tableData);
 
 // Public routes
 router.post("/signup", verifyToken, authorize("admin"), logAdminAction("CREATE", "USER_MANAGEMENT"), createUser);

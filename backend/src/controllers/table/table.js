@@ -1,15 +1,32 @@
 const { client_update } = require('../../configuration/database/databaseUpdate.js');
+const { RESTRICTED_TABLES } = require('../../config/restrictedTables');
 
 exports.table = async (req, res) => {
     try {
-        const query = `
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'app' 
-        AND table_type = 'BASE TABLE';
-      `;
+        let query;
+        const params = [];
 
-        const result = await client_update.query(query);
+        // if (req.user && req.user.role === 'admin') {
+        //     // Admin can see all tables
+        //     query = `
+        //         SELECT table_name
+        //         FROM information_schema.tables
+        //         WHERE table_schema = 'app' 
+        //         AND table_type = 'BASE TABLE';
+        //     `;
+        // } else {
+            // Non-admin users can only see non-restricted tables
+            query = `
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'app' 
+                AND table_type = 'BASE TABLE'
+                AND table_name NOT IN (${RESTRICTED_TABLES.map((_, i) => `$${i + 1}`).join(',')});
+            `;
+            params.push(...RESTRICTED_TABLES);
+        // }
+
+        const result = await client_update.query(query, params);
         res.status(200).json({
             success: true,
             tables: result.rows,

@@ -10,6 +10,7 @@ export const EXCLUDED_TABLES = [
     'column_permission',
     'dynamic_dropdowns',
     'column_renames',
-    'column_validations'
+    'column_validations',
+    'admin_action_logs'
     // Add any other tables you want to hide
   ];
