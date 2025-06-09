@@ -39,23 +39,23 @@ exports.refreshToken = async (req, res) => {
     
     // ------- for sending refresh token to frontend in cookies
 
-    res.cookie("refreshtoken", newRefreshToken, {
-      httpOnly: false, // Allow JavaScript access in development
-      secure: false, // Allow non-HTTPS in development
-      sameSite: "Lax", // Allow cross-site cookies
-      domain: "localhost", // Explicitly set domain
-      path: "/",
-      maxAge: 20 * 60 * 1000, // 20 minutes
-    });
-
-
     // res.cookie("refreshtoken", newRefreshToken, {
     //   httpOnly: false, // Allow JavaScript access in development
-    //   secure: true, // Allow non-HTTPS in development
+    //   secure: false, // Allow non-HTTPS in development
     //   sameSite: "Lax", // Allow cross-site cookies
-    //   domain: "misadmindev.sundarammutual.com", // Explicitly set domain
+    //   domain: "localhost", // Explicitly set domain
+    //   path: "/",
     //   maxAge: 20 * 60 * 1000, // 20 minutes
     // });
+
+
+    res.cookie("refreshtoken", newRefreshToken, {
+      httpOnly: false, // Allow JavaScript access in development
+      secure: true, // Allow non-HTTPS in development
+      sameSite: "Lax", // Allow cross-site cookies
+      domain: "misadmindev.sundarammutual.com", // Explicitly set domain
+      maxAge: 20 * 60 * 1000, // 20 minutes
+    });
 
     // --------
 
