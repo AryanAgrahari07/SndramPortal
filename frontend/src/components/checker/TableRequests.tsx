@@ -450,14 +450,29 @@ export const TableRequests = () => {
 
   if (requests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4">
-        <FileWarning className="h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No pending changes
-        </h3>
-        <p className="text-gray-500">
-          There are no changes to review for this table
-        </p>
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 border-b pb-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-[#1A237E] hover:text-[#1A237E]/80 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <span className="text-gray-500">Overview</span>
+          <span className="text-gray-400">/</span>
+          <h2 className="text-[#1A237E] font-medium capitalize">
+            {tableName?.toLowerCase().replace(/_/g, " ")}
+          </h2>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
+          <FileWarning className="h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No pending changes
+          </h3>
+          <p className="text-gray-500">
+            There are no changes to review for this table
+          </p>
+        </div>
       </div>
     );
   }
