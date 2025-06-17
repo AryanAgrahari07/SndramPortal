@@ -190,23 +190,58 @@ exports.verifyOTP = async (req, res) => {
         }
 
 
-        res.cookie("sessionid", sessionId, {
-          httpOnly: false, // Allow JavaScript access in development
-          secure: false, // Allow non-HTTPS in development
-          sameSite: "Lax", // Allow cross-site cookies
-          domain: "localhost", // Explicitly set domain
-          path: "/",
-          maxAge: 12 * 60 * 60 * 1000, // 12 hours
+        let cookieOptions;
+
+        if (process.env.NODE_ENV === 'production') {
+          cookieOptions = {
+            httpOnly: false,
+            secure: true,
+            sameSite: "Lax",
+            domain: "misadmindev.sundarammutual.com",
+            path: "/"
+          };
+        } else {
+          cookieOptions = {
+            httpOnly: false,
+            secure: false,
+            sameSite: "Lax",
+            domain: "localhost",
+            path: "/"
+          };
+        }
+
+        // For refresh token
+        res.cookie("refreshtoken", refreshToken, {
+          ...cookieOptions,
+          maxAge: 20 * 60 * 1000 // 20 minutes
         });
 
-        res.cookie("refreshtoken", refreshToken, {
-          httpOnly: false, // Allow JavaScript access in development
-          secure: false, // Allow non-HTTPS in development
-          sameSite: "Lax", // Allow cross-site cookies
-          domain: "localhost", // Explicitly set domain
-          path: "/",
-          maxAge: 20 * 60 * 1000, // 20 minutes
+        // For session ID (when needed)
+        res.cookie("sessionid", sessionId, {
+          ...cookieOptions,
+          maxAge: 12 * 60 * 60 * 1000 // 12 hours
         });
+
+
+
+
+        // res.cookie("sessionid", sessionId, {
+        //   httpOnly: false, // Allow JavaScript access in development
+        //   secure: false, // Allow non-HTTPS in development
+        //   sameSite: "Lax", // Allow cross-site cookies
+        //   domain: "localhost", // Explicitly set domain
+        //   path: "/",
+        //   maxAge: 12 * 60 * 60 * 1000, // 12 hours
+        // });
+
+        // res.cookie("refreshtoken", refreshToken, {
+        //   httpOnly: false, // Allow JavaScript access in development
+        //   secure: false, // Allow non-HTTPS in development
+        //   sameSite: "Lax", // Allow cross-site cookies
+        //   domain: "localhost", // Explicitly set domain
+        //   path: "/",
+        //   maxAge: 20 * 60 * 1000, // 20 minutes
+        // });
 
 
         // res.cookie("sessionid", sessionId, {

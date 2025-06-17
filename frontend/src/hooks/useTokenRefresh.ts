@@ -6,17 +6,17 @@ import { API_URL } from "@/config/constants";
 const REFRESH_BUFFER_TIME = 20; // seconds before expiry to refresh
 const CHECK_INTERVAL = 10; // check every 5 seconds
 
-export const checkSession = async (accessToken: string | null) => {
-  const response = await fetch("/check-session", {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    credentials: "include", // Include cookies for session-based auth
-    cache: "no-store",
-  });
-  return response.ok;
-};
+// export const checkSession = async (accessToken: string | null) => {
+//   const response = await fetch("/check-session", {
+//     method: "GET",
+//     headers: {
+//       Authorization: `Bearer ${accessToken}`,
+//     },
+//     credentials: "include", // Include cookies for session-based auth
+//     cache: "no-store",
+//   });
+//   return response.ok;
+// };
 
 export const useTokenRefresh = () => {
   const navigate = useNavigate();
