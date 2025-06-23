@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Database, Table, List } from "lucide-react";
+import { Plus, Trash2, Database, Table, List, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +42,10 @@ const GroupConfiguration: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<TableGroup | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddTablesDialogOpen, setIsAddTablesDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroupName, setEditingGroupName] = useState("");
+  const [oldGroupName, setOldGroupName] = useState("");
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [availableTables, setAvailableTables] = useState<string[]>([]);
@@ -57,7 +60,7 @@ const GroupConfiguration: React.FC = () => {
     tableName: "",
   });
 
-  const validateGroupName = (name: string): { isValid: boolean; message: string } => {
+  const validateGroupName = (name: string, oldName: string = ""): { isValid: boolean; message: string } => {
     const trimmedName = name.trim();
     
     if (!trimmedName) {
@@ -73,8 +76,11 @@ const GroupConfiguration: React.FC = () => {
       return { isValid: false, message: "Group name can only contain letters, spaces, underscores, and hyphens" };
     }
 
-    // Check for duplicate group names
-    if (groups.some(group => group.group_name.toLowerCase() === trimmedName.toLowerCase())) {
+    // Check for duplicate group names, excluding the current one being edited
+    if (groups.some(group => 
+      group.group_name.toLowerCase() === trimmedName.toLowerCase() && 
+      group.group_name.toLowerCase() !== oldName.toLowerCase()
+    )) {
       return { isValid: false, message: "Group name already exists" };
     }
 
@@ -193,7 +199,6 @@ const GroupConfiguration: React.FC = () => {
   }
   };
 
-
   const handleCreateGroup = async () => {
     const validation = validateGroupName(newGroupName);
     if (!validation.isValid) {
@@ -208,7 +213,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const sanitizedGroupName = encodeURIComponent(newGroupName.trim());
+      const trimmedGroupName = newGroupName.trim();
       
       const response = await fetch("http://localhost:8080/addGroup", {
         method: "POST",
@@ -217,7 +222,7 @@ const GroupConfiguration: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ group_name: sanitizedGroupName }),
+        body: JSON.stringify({ group_name: trimmedGroupName }),
       });
 
       const data = await response.json();
@@ -237,6 +242,68 @@ const GroupConfiguration: React.FC = () => {
         title: "Error",
         description:
           error instanceof Error ? error.message : "Failed to create group",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditGroup = (group: TableGroup) => {
+    setOldGroupName(group.group_name);
+    setEditingGroupName(group.group_name);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateGroupName = async () => {
+    // Validate the new group name
+    if (oldGroupName === editingGroupName) {
+      setIsEditDialogOpen(false);
+      return;
+    }
+
+    const validation = validateGroupName(editingGroupName, oldGroupName);
+    if (!validation.isValid) {
+      toast({
+        title: "Error",
+        description: validation.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8080/updategroup", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          old_group_name: oldGroupName,
+          new_group_name: editingGroupName.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchGroups();
+        setIsEditDialogOpen(false);
+        toast({
+          title: "Success",
+          description: "Group name updated successfully",
+        });
+      } else {
+        throw new Error(data.message || "Failed to update group name");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to update group name",
         variant: "destructive",
       });
     } finally {
@@ -337,7 +404,6 @@ const GroupConfiguration: React.FC = () => {
       setIsLoading(false);
     }
   };
-
 
   const handleDeleteTable = (groupName: string, tableName: string) => {
     setConfirmTableDialog({
@@ -449,32 +515,45 @@ const GroupConfiguration: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                  <div className="flex items-center gap-2">
-              <Switch
-                checked={group.is_enabled}
-                onCheckedChange={(checked) => handleToggleGroup(group.group_name, checked)}
-                aria-label={`Toggle ${group.group_name} group`}
-              />
-              <span className="text-sm text-gray-500">
-                {group.is_enabled ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
-                    <Button
-                      onClick={() => handleOpenAddTablesDialog(group)}
-                      className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
-                      disabled={isLoading}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Tables
-                    </Button>
-                    <Button
-                      onClick={() => handleDeleteGroup(group)}
-                      variant="destructive"
-                      disabled={isLoading}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 mr-2">
+                      <Switch
+                        checked={group.is_enabled}
+                        onCheckedChange={(checked) => handleToggleGroup(group.group_name, checked)}
+                        aria-label={`Toggle ${group.group_name} group`}
+                      />
+                      <span className="text-sm text-gray-500">
+                        {group.is_enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleEditGroup(group)}
+                        className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
+                        disabled={isLoading}
+                        title="Edit Group Name"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={() => handleOpenAddTablesDialog(group)}
+                        className="bg-[#0F172A] hover:bg-[#0F172A]/90 text-white"
+                        disabled={isLoading}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Tables
+                      </Button>
+                      <Button
+                        onClick={() => handleDeleteGroup(group)}
+                        variant="destructive"
+                        disabled={isLoading}
+                        title="Delete Group"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -680,17 +759,107 @@ const GroupConfiguration: React.FC = () => {
         </Dialog>
 
         <ConfirmDialog
-        isOpen={confirmTableDialog.isOpen}
-        onClose={() =>
-          setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" })
-        }
-        onConfirm={() => {
-          confirmDeleteTable(confirmTableDialog.groupName, confirmTableDialog.tableName);
-          setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" });
-        }}
-        title="Confirm Table Removal"
-        description={`Are you sure you want to remove "${confirmTableDialog.tableName}" from the group "${confirmTableDialog.groupName}"? This action cannot be undone.`}
-      />
+          isOpen={confirmTableDialog.isOpen}
+          onClose={() =>
+            setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" })
+          }
+          onConfirm={() => {
+            confirmDeleteTable(confirmTableDialog.groupName, confirmTableDialog.tableName);
+            setConfirmTableDialog({ isOpen: false, groupName: "", tableName: "" });
+          }}
+          title="Confirm Table Removal"
+          description={`Are you sure you want to remove "${confirmTableDialog.tableName}" from the group "${confirmTableDialog.groupName}"? This action cannot be undone.`}
+        />
+
+        {/* Edit Group Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
+            <div className="flex flex-col gap-0">
+              <div className="px-6 pt-6 pb-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 rounded-full">
+                      <Edit className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <DialogTitle className="text-xl font-semibold text-[#0F172A]">
+                        Edit Group Name
+                      </DialogTitle>
+                      <DialogDescription className="text-sm text-gray-500">
+                        Update the name for this group.
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 border-y border-gray-100">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Group Name
+                    </Label>
+                    <Input
+                      placeholder="Enter group name"
+                      value={editingGroupName}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (/^[A-Za-z\s_-]*$/.test(value)) {
+                          setEditingGroupName(value);
+                        }
+                      }}
+                      className={`w-full p-2.5 rounded-md border ${
+                        editingGroupName && !validateGroupName(editingGroupName, oldGroupName).isValid
+                          ? "border-red-500 focus:ring-red-500"
+                          : "border-gray-200 focus:ring-[#0F172A]/10 focus:border-[#0F172A]"
+                      } bg-white`}
+                    />
+                    {editingGroupName && !validateGroupName(editingGroupName, oldGroupName).isValid && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {validateGroupName(editingGroupName, oldGroupName).message}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Group name should contain only letters, spaces, underscores, and hyphens.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditDialogOpen(false);
+                    setEditingGroupName("");
+                    setOldGroupName("");
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F172A]/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateGroupName}
+                  disabled={isLoading || !validateGroupName(editingGroupName, oldGroupName).isValid || editingGroupName === oldGroupName}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Updating...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <Edit className="h-4 w-4 mr-2" />
+                      <span>Update Group</span>
+                    </div>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

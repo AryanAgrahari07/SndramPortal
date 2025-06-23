@@ -389,7 +389,10 @@ const AdminLogs: React.FC = () => {
         if (log.action_type === "CREATE") {
           return `Created group "${info.group_name}" with ${info.tables?.length || 0} tables`;
         } else if (log.action_type === "UPDATE") {
-          if (info.action === "Group Toggled") {
+          if (info.action === "Group Renamed") {
+            // Special handling for group name change
+            return `Renamed group from "${info.old_group_name}" to "${info.group_name}"`;
+          } else if (info.action === "Group Toggled") {
             return `${info.new_status} group "${info.group_name}"`;
           } else if (requestBody.is_enabled !== undefined) {
             // Handle enable/disable operations
@@ -411,6 +414,9 @@ const AdminLogs: React.FC = () => {
             } else {
               return `Updated group "${info.group_name || requestBody.group_name}"`;
             }
+          } else if (requestBody.old_group_name && requestBody.new_group_name) {
+            // Additional check for group name update from request body
+            return `Renamed group from "${requestBody.old_group_name}" to "${requestBody.new_group_name}"`;
           } else {
             // Check if we have table data in the response
             const responseData = log.action_details?.response?.data;
@@ -704,7 +710,16 @@ const AdminLogs: React.FC = () => {
         break;
         
       case "GROUP_MANAGEMENT":
-        details.push(`Group: ${info.group_name || requestBody.group_name || ''}`);
+        if (info.action === "Group Renamed" || (requestBody.old_group_name && requestBody.new_group_name)) {
+          // For group rename, display both old and new names
+          const oldName = info.old_group_name || requestBody.old_group_name;
+          const newName = info.group_name || requestBody.new_group_name;
+          details.push(`Old Group Name: ${oldName}`);
+          details.push(`New Group Name: ${newName}`);
+          details.push(`Action: Renamed group`);
+        } else {
+          details.push(`Group: ${info.group_name || requestBody.group_name || ''}`);
+        }
         
         if (log.action_type === "CREATE") {
           if (info.tables && Array.isArray(info.tables) && info.tables.length > 0) {
@@ -770,8 +785,8 @@ const AdminLogs: React.FC = () => {
                 }
               }
             }
-          } else {
-            // For normal updates
+          } else if (!(info.action === "Group Renamed" || (requestBody.old_group_name && requestBody.new_group_name))) {
+            // For normal updates (not group renames)
             // Check for added tables in request body
             if (requestBody.table_list && Array.isArray(requestBody.table_list)) {
               details.push(`Added tables: ${requestBody.table_list.join(", ")}`);
@@ -1982,17 +1997,21 @@ const AdminLogs: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <div className="font-medium flex items-start gap-1">
-                      <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800 whitespace-nowrap">
-                        {log.section === "TABLE_CONFIG" && log.action_type === "DELETE" ? 
-                          (log.additional_info?.original_table_name || 
-                           (log.action_details?.response?.data?.original_table_name) || 
-                           log.target_table).replace('app.', '') :
-                         log.section === "GROUP_MANAGEMENT" ? 
-                          (log.additional_info?.group_name || 
-                           log.action_details?.requestBody?.group_name || 
-                           "Unknown Group") :
-                          log.target_table ? log.target_table.replace('app.', '') : "System"}
-                      </span>
+                                                <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800 whitespace-nowrap">
+                            {log.section === "TABLE_CONFIG" && log.action_type === "DELETE" ? 
+                              (log.additional_info?.original_table_name || 
+                               (log.action_details?.response?.data?.original_table_name) || 
+                               log.target_table).replace('app.', '') :
+                             log.section === "GROUP_MANAGEMENT" && log.additional_info?.action === "Group Renamed" ? 
+                              `${log.additional_info.old_group_name} → ${log.additional_info.group_name}` :
+                             log.section === "GROUP_MANAGEMENT" && log.action_details?.requestBody?.old_group_name && log.action_details?.requestBody?.new_group_name ? 
+                              `${log.action_details.requestBody.old_group_name} → ${log.action_details.requestBody.new_group_name}` :
+                             log.section === "GROUP_MANAGEMENT" ? 
+                              (log.additional_info?.group_name || 
+                               log.action_details?.requestBody?.group_name || 
+                               "Unknown Group") :
+                              log.target_table ? log.target_table.replace('app.', '') : "System"}
+                          </span>
                     </div>
                     <div className="text-xs text-gray-500 mt-1.5">
                       {getChangesSummary(log)}

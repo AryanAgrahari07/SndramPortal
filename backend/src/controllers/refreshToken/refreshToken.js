@@ -59,7 +59,7 @@ exports.refreshToken = async (req, res) => {
     }
 
     // For refresh token
-    res.cookie("refreshtoken", refreshToken, {
+    res.cookie("refreshtoken", newRefreshToken, {
       ...cookieOptions,
       maxAge: 20 * 60 * 1000 // 20 minutes
     });

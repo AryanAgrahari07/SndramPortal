@@ -36,8 +36,7 @@ const {
 const {
   fetchDropdownOptions,
 } = require("../controllers/fetchDropdownOptions/fetchDropdownOptions.js");
-const { addGroup } = require("../controllers/tablesGroup/tableGroup.js");
-const { addTable } = require("../controllers/tablesGroup/tableGroup.js");
+const { addGroup, updateGroupName, addTable } = require("../controllers/tablesGroup/tableGroup.js");
 const { getGroupList } = require("../controllers/getGroupList/getGroupList.js");
 const { getGroupListMaker } = require("../controllers/getGroupList/getGroupListMaker.js");
 const { removeGroup } = require("../controllers/removeGroup/removeGroup.js");
@@ -186,6 +185,7 @@ router.post("/fetchDropdownOptions", verifyToken, fetchDropdownOptions);
 
 // group configuration routes
 router.post("/addgroup", verifyToken, authorize("admin"), logAdminAction("CREATE", "GROUP_MANAGEMENT"), addGroup); //create group
+router.post("/updategroup", verifyToken, authorize("admin"), logAdminAction("UPDATE", "GROUP_MANAGEMENT"), updateGroupName); //update group name
 router.post("/addtable", verifyToken, authorize("admin"), logAdminAction("UPDATE", "GROUP_MANAGEMENT"), addTable); // add table inside of a group
 router.get("/getgrouplist", verifyToken, getGroupList); //show all group and table list respectively
 router.get("/getgrouplistmaker", verifyToken, getGroupListMaker); //show all group and table list respectively

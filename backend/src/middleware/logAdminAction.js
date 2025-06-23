@@ -240,25 +240,32 @@ function extractGroupDetails(body, actionType, req) {
         details.group_name = body.group_name;
         details.tables = body.tables || [];
     } else if (actionType === 'UPDATE') {
-        details.group_name = body.group_name;
-        
-        if (body.action === 'toggle') {
-            details.action = 'Group Toggled';
-            details.new_status = body.is_enabled ? 'Enabled' : 'Disabled';
-        } else if (body.action === 'addTable') {
-            details.action = 'Table Added to Group';
-            details.tables = body.tables || [];
+        // Special handling for group name updates
+        if (body.old_group_name && body.new_group_name) {
+            details.action = 'Group Renamed';
+            details.old_group_name = body.old_group_name;
+            details.group_name = body.new_group_name;
         } else {
-            details.action = 'Group Updated';
-            details.tables = body.tables || [];
+            details.group_name = body.group_name;
             
-            // If we have old tables, show what changed
-            if (body.old_tables) {
-                const oldTables = body.old_tables || [];
-                const newTables = body.tables || [];
+            if (body.action === 'toggle') {
+                details.action = 'Group Toggled';
+                details.new_status = body.is_enabled ? 'Enabled' : 'Disabled';
+            } else if (body.action === 'addTable') {
+                details.action = 'Table Added to Group';
+                details.tables = body.tables || [];
+            } else {
+                details.action = 'Group Updated';
+                details.tables = body.tables || [];
                 
-                details.added_tables = newTables.filter(t => !oldTables.includes(t));
-                details.removed_tables = oldTables.filter(t => !newTables.includes(t));
+                // If we have old tables, show what changed
+                if (body.old_tables) {
+                    const oldTables = body.old_tables || [];
+                    const newTables = body.tables || [];
+                    
+                    details.added_tables = newTables.filter(t => !oldTables.includes(t));
+                    details.removed_tables = oldTables.filter(t => !newTables.includes(t));
+                }
             }
         }
     } else if (actionType === 'DELETE') {
