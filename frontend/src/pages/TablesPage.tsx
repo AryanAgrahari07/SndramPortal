@@ -188,9 +188,10 @@ export const TablesPage: React.FC = () => {
   const filteredTables = tables.filter((table) => {
     const searchLower = searchQuery.toLowerCase();
     const tableName = table.table_name.toLowerCase();
+    const displayName = (table.display_name || "").toLowerCase();
 
-    // First check if table matches search query
-    const matchesSearch = tableName.includes(searchLower);
+    // First check if table matches search query in either original name or display name
+    const matchesSearch = tableName.includes(searchLower) || displayName.includes(searchLower);
 
     // If "all" is selected, only apply search filter
     if (selectedGroup === "all") {
