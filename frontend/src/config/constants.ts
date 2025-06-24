@@ -1,4 +1,5 @@
-export const API_URL = "http://localhost:8080";
+import { config } from "./env"; 
+export const API_URL = config.apiBaseUrl;
 
 export const ENDPOINTS = {
   AUTH: {

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/Switch";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
+import { API_URL } from "@/config/constants";
 
 interface ColumnConfig {
   column_name: string;
@@ -88,7 +89,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
   const fetchTables = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/table", {
+      const response = await fetch(`${API_URL}/table`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -121,7 +122,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
     try {
       const token = localStorage.getItem("token");
 
-      const columnResponse = await fetch("http://localhost:8080/fetchcolumn", {
+      const columnResponse = await fetch(`${API_URL}/fetchcolumn`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -143,7 +144,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
       }));
 
       const permissionResponse = await fetch(
-        "http://localhost:8080/ColumnPermission",
+        `${API_URL}/ColumnPermission`,
         {
           method: "POST",
           credentials: "include",
@@ -207,7 +208,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
           : col
       );
 
-      const response = await fetch("http://localhost:8080/ColumnPermission", {
+      const response = await fetch(`${API_URL}/ColumnPermission`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -261,7 +262,7 @@ const ColumnConfigurator: React.FC<ColumnConfiguratorProps> = ({
 
   const fetchRenamed = async (tableName: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+      const response = await fetch(`${API_URL}/renamed/${tableName}`, {
         method: "GET",
         credentials: "include",
         headers: {

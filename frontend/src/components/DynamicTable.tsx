@@ -19,8 +19,8 @@ import { Upload, AlertCircle, Download } from "lucide-react";
 import Papa from "papaparse";
 import { validateCSVData } from "../utils/csvValidation";
 import { API_URL } from "@/config/constants";
-import { preventXSS } from "@/config/ValidationConfig";
 import { sanitizeInput } from "@/utils/security";
+import { preventXSS } from "@/utils/security";
 
 interface CSVValidationError {
   row: number;
@@ -452,8 +452,8 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         character_maximum_length: null,
       }));
 
-      // Validate CSV data
-      const validationErrors = validateCSVData(results.data, columnTypes);
+      // Validate CSV data with the new async approach that fetches validation rules from backend
+      const validationErrors = await validateCSVData(results.data, columnTypes, tableName);
 
       if (validationErrors.length > 0) {
         setCSVErrors(validationErrors);

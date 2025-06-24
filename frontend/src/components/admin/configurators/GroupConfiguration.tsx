@@ -18,6 +18,7 @@ import { EXCLUDED_TABLES } from "@/config/tableConfig";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Switch } from "@/components/ui/Switch";
 import axios from "axios";
+import { API_URL } from "@/config/constants";
 
 interface TableGroup {
   group_id: string;
@@ -96,7 +97,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/getGroupList", {
+      const response = await fetch(`${API_URL}/getGroupList`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -131,7 +132,7 @@ const GroupConfiguration: React.FC = () => {
   const fetchAvailableTables = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/table", {
+      const response = await fetch(`${API_URL}/table`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -162,7 +163,7 @@ const GroupConfiguration: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-      "http://localhost:8080/toggle",
+      `${API_URL}/toggle`,
       {
         group_name: groupId, // Using group_name since that's what your schema uses
         is_enabled: isEnabled
@@ -215,7 +216,7 @@ const GroupConfiguration: React.FC = () => {
       const token = localStorage.getItem("token");
       const trimmedGroupName = newGroupName.trim();
       
-      const response = await fetch("http://localhost:8080/addGroup", {
+      const response = await fetch(`${API_URL}/addGroup`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -275,7 +276,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/updategroup", {
+      const response = await fetch(`${API_URL}/updategroup`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -324,7 +325,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/addtable", {
+      const response = await fetch(`${API_URL}/addtable`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -373,7 +374,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/removeGroup", {
+      const response = await fetch(`${API_URL}/removeGroup`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -417,7 +418,7 @@ const GroupConfiguration: React.FC = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/removeTable", {
+      const response = await fetch(`${API_URL}/removeTable`, {
         method: "POST",
         credentials: "include",
         headers: {

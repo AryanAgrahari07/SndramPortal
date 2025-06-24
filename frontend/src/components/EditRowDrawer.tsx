@@ -5,9 +5,10 @@ import { addTableRow } from "@/services/tableDataService";
 import DynamicDropdown from "@/components/ui/DynamicDropdown";
 import {
   preventXSS,
-} from "@/config/ValidationConfig";
+} from "@/utils/security";
 import { sanitizeInput } from "@/utils/security";
 import axios from "axios";
+import { API_URL } from "@/config/constants";
 
 interface DropdownConfig {
   columnName: string;
@@ -159,7 +160,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/api/dropdowns/${tableName}/${childColumn}/${encodeURIComponent(parentValue)}`,
+        `${API_URL}/api/dropdowns/${tableName}/${childColumn}/${encodeURIComponent(parentValue)}`,
         {
           credentials: "include",
           headers: {
@@ -207,7 +208,7 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     const fetchValidationRules = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:8080/admin/validations/${tableName}`,
+          `${API_URL}/admin/validations/${tableName}`,
           {
             withCredentials: true,
             headers: {

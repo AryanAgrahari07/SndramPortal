@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getAuthHeaders } from '../utils/authHeaders';
+import { API_URL } from '@/config/constants';
 
 export interface DropdownOption {
   value: string;
@@ -24,7 +25,7 @@ export interface ErrorResponse {
 export const dropdownConfigService = {
   async getTables() {
     const response = await axios.get<DropdownResponse>(
-      'http://localhost:8080/table',
+      `${API_URL}/table`,
       { headers: getAuthHeaders(), withCredentials: true  }
     );
     return response.data.data || [];
@@ -32,7 +33,7 @@ export const dropdownConfigService = {
 
   async fetchColumns(tableName: string) {
     const response = await axios.post<DropdownResponse>(
-      `http://localhost:8080/fetchcolumn`,
+      `${API_URL}/fetchcolumn`,
       { table_name: tableName },
       { headers: getAuthHeaders(), withCredentials: true  }
     );
@@ -41,7 +42,7 @@ export const dropdownConfigService = {
 
   async fetchColumnDropdownOptions(tableName: string, columnName: string) {
     const response = await axios.post<DropdownResponse>(
-      'http://localhost:8080/fetchColumnDropDown',
+      `${API_URL}/fetchColumnDropDown`,
       {
         table_name: tableName,
         columnName: columnName,
@@ -56,7 +57,7 @@ export const dropdownConfigService = {
     dropdownOptions: ColumnDropdownOption[]
   ) {
     const response = await axios.post<DropdownResponse>(
-      'http://localhost:8080/updateColumnDropDown',
+      `${API_URL}/updateColumnDropDown`,
       {
         table_name: tableName,
         dropdown_options: dropdownOptions,

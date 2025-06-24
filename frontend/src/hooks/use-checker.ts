@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { API_URL } from "@/config/constants";
 
 interface UseCheckerProps {
   onActionComplete?: () => void;
@@ -24,7 +25,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
     async (rowId: string, requestId: string, comments?: string) => {
       try {
         setIsLoading(true);
-        const response = await fetch("http://localhost:8080/approve", {
+        const response = await fetch(`${API_URL}/approve`, {
           method: "POST",
           credentials: "include",
           headers: {
@@ -69,7 +70,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
     async (rowId: string, comments: string) => {
       try {
         setIsLoading(true);
-        const response = await fetch("http://localhost:8080/reject", {
+        const response = await fetch(`${API_URL}/reject`, {
           method: "POST",
           credentials: "include",
           headers: {
@@ -108,7 +109,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
     async (rowIds: string[], comments?: string) => {
       try {
         setIsLoading(true);
-        const response = await fetch("http://localhost:8080/allApprove", {
+        const response = await fetch(`${API_URL}/allApprove`, {
           method: "POST",
           credentials: "include",
           headers: {
@@ -149,7 +150,7 @@ export const useChecker = ({ onActionComplete }: UseCheckerProps = {}) => {
     async (rowIds: string[], comments: string) => {
       try {
         setIsLoading(true);
-        const response = await fetch("http://localhost:8080/allReject", {
+        const response = await fetch(`${API_URL}/allReject`, {
           method: "POST",
           credentials: "include",
           headers: {

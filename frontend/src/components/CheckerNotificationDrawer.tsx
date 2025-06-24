@@ -10,6 +10,7 @@ import { Badge } from "../components/ui/Badge";
 import { format } from "date-fns";
 import { Card, CardContent } from "../components/ui/Card";
 import { toast } from "../hooks/use-toast"; // Import toast
+import { API_URL } from "@/config/constants";
 
 interface CheckerNotification {
   table_name: string;
@@ -51,7 +52,7 @@ export function CheckerNotificationDrawer({
         }
 
         const response = await fetch(
-          "http://localhost:8080/checker-notification",
+          `${API_URL}/checker-notification`,
           {
             credentials: "include",
             headers: {

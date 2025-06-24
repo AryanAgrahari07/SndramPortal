@@ -60,7 +60,7 @@ interface FilterParams {
   sectionFilter: string;
 }
 
-const API_URL = 'http://localhost:8080';
+import { API_URL } from "@/config/constants";
 
 const AdminLogs: React.FC = () => {
   const [logs, setLogs] = useState<AdminLog[]>([]);

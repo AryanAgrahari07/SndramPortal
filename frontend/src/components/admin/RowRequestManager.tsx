@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { API_URL } from "@/config/constants";
 
 interface RowData {
   [key: string]: string | number | boolean | null | undefined;
@@ -79,7 +80,7 @@ const RowDataDialog: React.FC<RowDataDialogProps> = ({
   const fetchRenamed = async (tableName: string) => {
     try {
       setIsLoadingColumns(true);
-      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+      const response = await fetch(`${API_URL}/renamed/${tableName}`, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -336,7 +337,7 @@ export default function RowRequestManager({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/fetchrowrequest", {
+      const response = await fetch(`${API_URL}/fetchrowrequest`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -373,7 +374,7 @@ export default function RowRequestManager({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/acceptrow", {
+      const response = await fetch(`${API_URL}/acceptrow`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -409,7 +410,7 @@ export default function RowRequestManager({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/rejectrow", {
+      const response = await fetch(`${API_URL}/rejectrow`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -470,7 +471,7 @@ export default function RowRequestManager({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/acceptallrow", {
+      const response = await fetch(`${API_URL}/acceptallrow`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -508,7 +509,7 @@ export default function RowRequestManager({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/rejectallrow", {
+      const response = await fetch(`${API_URL}/rejectallrow`, {
         method: "POST",
         credentials: "include",
         headers: {

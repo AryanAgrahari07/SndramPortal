@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
 import { sanitizeInput } from "@/utils/security";
-// import { API_URL } from "@/config/constants";
+import { API_URL } from "@/config/constants";
 
 interface DropdownOption {
   value: string;
@@ -126,7 +126,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   const fetchTables = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/table", {
+      const response = await fetch(`${API_URL}/table`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -158,7 +158,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/fetchcolumn", {
+      const response = await fetch(`${API_URL}/fetchcolumn`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -194,7 +194,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        "http://localhost:8080/fetchColumnDropDown",
+        `${API_URL}/fetchColumnDropDown`,
         {
           method: "POST",
           credentials: "include",
@@ -297,7 +297,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/api/dropdowns/${selectedTable}`,
+        `${API_URL}/api/dropdowns/${selectedTable}`,
         {
           credentials: "include",
           headers: {
@@ -331,7 +331,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        "http://localhost:8080/fetchColumnDropDown",
+        `${API_URL}/fetchColumnDropDown`,
         {
           method: "POST",
           credentials: "include",
@@ -366,7 +366,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/api/validations/dropdown-value", {
+      const response = await fetch(`${API_URL}/api/validations/dropdown-value`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -596,7 +596,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/api/dropdowns/${selectedTable}/${selectedColumn}/${parentValue}`,
+        `${API_URL}/api/dropdowns/${selectedTable}/${selectedColumn}/${parentValue}`,
         {
           credentials: "include",
           headers: {
@@ -646,7 +646,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
 
       // First, fetch existing options for the table
       const existingOptionsResponse = await fetch(
-        `http://localhost:8080/api/dropdowns/${selectedTable}`,
+        `${API_URL}/api/dropdowns/${selectedTable}`,
         {
           credentials: "include",
           headers: {
@@ -701,7 +701,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
 
       // Save all options
       const response = await fetch(
-        "http://localhost:8080/api/admin/dropdowns/" + selectedTable,
+        `${API_URL}/api/admin/dropdowns/${selectedTable}`,
         {
           method: "PUT",
           credentials: "include",
@@ -742,7 +742,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
   const fetchRenamed = async (tableName: string) => {
     try {
       const response = await fetch(
-        `http://localhost:8080/renamed/${tableName}`,
+        `${API_URL}/renamed/${tableName}`,
         {
           method: "GET",
           credentials: "include",
@@ -1132,7 +1132,7 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       // Send data to the API endpoint
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/api/admin/dropdowns/${selectedTable}/bulk-upload`,
+        `${API_URL}/api/admin/dropdowns/${selectedTable}/bulk-upload`,
         {
           method: "POST",
           credentials: "include",

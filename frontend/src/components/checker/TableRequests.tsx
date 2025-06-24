@@ -111,7 +111,7 @@ export const TableRequests = () => {
 };
 
   const fetchRenamed = async () => {
-    const response = await fetch(`http://localhost:8080/renamed/${tableName}`,
+    const response = await fetch(`${API_URL}/renamed/${tableName}`,
       {
         method: "GET",
         credentials: "include",

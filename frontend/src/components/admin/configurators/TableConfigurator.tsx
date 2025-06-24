@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import logo from "@/assets/images/select-table.svg";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { API_URL } from "@/config/constants";
 
 interface TableMetadata {
   id: string;
@@ -106,7 +107,7 @@ const TableConfigurator: React.FC = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/delete-renamed-tables/${id}`,
+        `${API_URL}/delete-renamed-tables/${id}`,
         {
           method: "DELETE",
           credentials: "include",
@@ -150,7 +151,7 @@ const TableConfigurator: React.FC = () => {
   const fetchTables = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/get-renamed-tables", {
+      const response = await fetch(`${API_URL}/get-renamed-tables`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -175,7 +176,7 @@ const TableConfigurator: React.FC = () => {
   const fetchAvailableTables = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8080/table", {
+      const response = await fetch(`${API_URL}/table`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -217,8 +218,8 @@ const TableConfigurator: React.FC = () => {
       };
 
       const endpoint = selectedTable
-        ? `http://localhost:8080/update-renamed-tables/${selectedTable.id}`
-        : "http://localhost:8080/rename-tables";
+        ? `${API_URL}/update-renamed-tables/${selectedTable.id}`
+        : `${API_URL}/rename-tables`;
       const method = selectedTable ? "PUT" : "POST";
 
       const response = await fetch(endpoint, {

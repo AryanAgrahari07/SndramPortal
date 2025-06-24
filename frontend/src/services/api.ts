@@ -1,7 +1,8 @@
 import axios from "axios";
 import { RequestDataPayload, RequestDataResponse } from "../types/requestData";
+import { API_URL } from "@/config/constants";
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = `${API_URL}`;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");

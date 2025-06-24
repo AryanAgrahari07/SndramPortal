@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { Pagination } from "@/components/Pagination";
 import { Input } from "@/components/ui/input";
+import { API_URL } from "@/config/constants";
 
 interface HistoryRecord {
   id: string;
@@ -99,7 +100,7 @@ export const AdminHistory = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://localhost:8080/history?page=${filterParams.currentPage}&limit=${itemsPerPage}&status=${filterStatus}&search=${searchQuery}&from=${customDateRange.from}&to=${customDateRange.to}&sortBy=${filterParams.sortColumn}&sortOrder=${filterParams.sortDirection}&type=${filterParams.typeFilter}`,
+        `${API_URL}/history?page=${filterParams.currentPage}&limit=${itemsPerPage}&status=${filterStatus}&search=${searchQuery}&from=${customDateRange.from}&to=${customDateRange.to}&sortBy=${filterParams.sortColumn}&sortOrder=${filterParams.sortDirection}&type=${filterParams.typeFilter}`,
         {
           credentials: "include",
           headers: {
@@ -142,7 +143,7 @@ export const AdminHistory = () => {
     try {
       setIsLoadingColumns(true);
       const response = await fetch(
-        `http://localhost:8080/renamed/${tableName}`,
+        `${API_URL}/renamed/${tableName}`,
         {
           method: "GET",
           credentials: "include",

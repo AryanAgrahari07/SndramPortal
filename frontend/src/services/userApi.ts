@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import { API_URL } from "@/config/constants";
 
 interface ErrorResponse {
   message?: string;
@@ -22,7 +23,7 @@ interface HighlightResponse {
   error?: string;
 }
 
-const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = `${API_URL}`;
 
 export type UserRole = "maker" | "checker" | "admin";
 

@@ -15,6 +15,7 @@ import {
 } from "@/services/notificationService";
 import { Badge } from "./ui/Badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { API_URL } from "@/config/constants";
 
 interface NotificationDrawerProps {
   isOpen: boolean;
@@ -110,7 +111,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   const fetchRenamed = async (tableName: string) => {
     try {
       setIsLoadingColumns(true);
-      const response = await fetch(`http://localhost:8080/renamed/${tableName}`, {
+      const response = await fetch(`${API_URL}/renamed/${tableName}`, {
         method: "GET",
         credentials: "include",
         headers: {

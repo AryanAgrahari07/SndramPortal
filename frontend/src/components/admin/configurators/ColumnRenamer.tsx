@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { EXCLUDED_TABLES } from '@/config/tableConfig';
 import { Pagination } from '@/components/Pagination';
+import { API_URL } from '@/config/constants';
 
 interface TableColumn {
   column_name: string;
@@ -57,7 +58,7 @@ const ColumnRenamer = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        "http://localhost:8080/table",
+        `${API_URL}/table`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -87,7 +88,7 @@ const ColumnRenamer = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       const columnsResponse = await axios.post(
-        `http://localhost:8080/fetchcolumn`,
+        `${API_URL}/fetchcolumn`,
         {table_name: selectedTable},
         {
           headers: {
@@ -98,7 +99,7 @@ const ColumnRenamer = () => {
       );
 
       const renamesResponse = await axios.get(
-        `http://localhost:8080/columns/${selectedTable}`,
+        `${API_URL}/columns/${selectedTable}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -131,7 +132,7 @@ const ColumnRenamer = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:8080/column-rename/${selectedTable}/${columnName}`,
+        `${API_URL}/column-rename/${selectedTable}/${columnName}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -152,7 +153,7 @@ const ColumnRenamer = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        "http://localhost:8080/column-rename",
+        `${API_URL}/column-rename`,
         {
             table_name: selectedTable,
             original_column_name: columnName,

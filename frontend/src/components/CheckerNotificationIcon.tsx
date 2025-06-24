@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/Badge";
 import { CheckerNotificationDrawer } from "./CheckerNotificationDrawer";
 import {toast} from "../hooks/use-toast";
+import { API_URL } from "@/config/constants";
 
 interface CheckerNotification {
   table_name: string;
@@ -30,7 +31,7 @@ export function CheckerNotificationIcon() {
           throw new Error('No authentication token found');
         }
 
-        const response = await fetch("http://localhost:8080/checker-notification", {
+        const response = await fetch(`${API_URL}/checker-notification`, {
           credentials: "include",
           headers: {
             'Authorization': `Bearer ${token}`,

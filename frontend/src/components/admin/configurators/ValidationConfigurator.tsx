@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import axios from "axios";
 import { EXCLUDED_TABLES } from "@/config/tableConfig";
+import { API_URL } from "@/config/constants";
 
 interface ValidationRule {
   validation_id: string;
@@ -71,7 +72,7 @@ const ValidationConfigurator: React.FC = () => {
   useEffect(() => {
     const fetchTables = async () => {
       try {
-        const response = await axios.get("http://localhost:8080/table", {
+        const response = await axios.get(`${API_URL}/table`, {
           withCredentials: true,
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -103,7 +104,7 @@ const ValidationConfigurator: React.FC = () => {
       try {
         // Fetch columns with data types
         const columnsResponse = await axios.post(
-          "http://localhost:8080/fetchcolumnwithdatatype",
+          `${API_URL}/fetchcolumnwithdatatype`,
           { table_name: selectedTable },
           {
             withCredentials: true,
@@ -115,7 +116,7 @@ const ValidationConfigurator: React.FC = () => {
 
         // Fetch renamed columns
         const renamesResponse = await axios.get(
-          `http://localhost:8080/columns/${selectedTable}`,
+          `${API_URL}/columns/${selectedTable}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -164,7 +165,7 @@ const ValidationConfigurator: React.FC = () => {
       setIsLoading(true);
       try {
         const response = await axios.get(
-          `http://localhost:8080/admin/validations/${selectedTable}/${selectedColumn}`,
+          `${API_URL}/admin/validations/${selectedTable}/${selectedColumn}`,
           {
             withCredentials: true,
             headers: {
@@ -208,7 +209,7 @@ const ValidationConfigurator: React.FC = () => {
       );
 
       const response = await axios.post(
-        "http://localhost:8080/admin/validations/rules",
+        `${API_URL}/admin/validations/rules`,
         {
           ...cleanValidationRule,
           table_name: selectedTable,
