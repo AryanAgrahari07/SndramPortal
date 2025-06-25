@@ -138,7 +138,7 @@ export const Overview = () => {
                     : "text-[#1A237E] border-[#1A237E] hover:bg-[#E8EAF6]"
                 }`}
                 >
-             Ungroup
+             All
             </Button>
             <Button
                 variant={selectedView === "group" ? "default" : "outline"}
@@ -149,7 +149,7 @@ export const Overview = () => {
                     : "text-[#1A237E] border-[#1A237E] hover:bg-[#E8EAF6]"
                 }`}
                 >
-              Group
+              Grouped
            </Button>
         </div>
         <div className="text-sm">
