@@ -411,18 +411,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       });
       return;
     }
-  
-    // First perform the basic format validation
-    const validFormat = /^[A-Za-z\s_-]+$/;
-    if (!validFormat.test(trimmedOption)) {
-      toast({
-        title: "Error",
-        description:
-          "Option can only contain letters, spaces, underscores, and hyphens",
-        variant: "destructive",
-      });
-      return;
-    }
 
     // Now validate against any configured validation rules
     const validation = await validateDropdownValue(trimmedOption);
@@ -821,17 +809,6 @@ const DropdownManager: React.FC<DropdownManagerProps> = ({
       toast({
         title: "Error",
         description: "Option cannot be empty",
-        variant: "destructive",
-      });
-      return;
-    }
-    // Validate option format
-    const validFormat = /^[A-Za-z0-9\s_-]+$/;
-    if (!validFormat.test(trimmedOption)) {
-      toast({
-        title: "Error",
-        description:
-          "Option can only contain letters, numbers, spaces, underscores, and hyphens",
         variant: "destructive",
       });
       return;
