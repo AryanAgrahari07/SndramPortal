@@ -6,7 +6,7 @@ export const sanitizeInput = (input: string): string => {
       // Escape special characters
       .replace(/['"\\]/g, '')
       // Remove common SQL keywords
-      .replace(/\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b/gi, '')
+      .replace(/\b(DELETE|DROP)\b/gi, '')
   
     return sanitized;
   };

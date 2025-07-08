@@ -245,10 +245,10 @@ export const EditRowDrawer: React.FC<EditRowDrawerProps> = ({
     const dataType = dataTypes[column]?.toLowerCase();
 
     // SQL Injection Prevention
-    const sqlInjectionPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
-    if (sqlInjectionPattern.test(stringValue)) {
-      return "Invalid input: Contains potentially harmful characters or keywords";
-    }
+    // const sqlInjectionPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER)\b)|(['";])/i;
+    // if (sqlInjectionPattern.test(stringValue)) {
+    //   return "Invalid input: Contains potentially harmful characters or keywords";
+    // }
 
     if (validationRule) {
       // Special characters validation
