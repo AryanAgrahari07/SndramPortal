@@ -45,6 +45,13 @@ interface RowRequest {
   maker_email: string;
 }
 
+interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface ColumnMapping {
   original_column_name: string;
   renamed_column_name: string;
@@ -206,7 +213,6 @@ export default function RowRequestManager({
   } | null>(null);
   const [selectedMaker, setSelectedMaker] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isDateFilterDialogOpen, setIsDateFilterDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{
     start: string;
@@ -341,6 +347,91 @@ export default function RowRequestManager({
     }
   }, [selectTable]);
 
+  // Update pagination state
+  const [paginationData, setPaginationData] = useState<PaginationData>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0
+  });
+
+  // Fetch requests with pagination and sorting
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: paginationData.page.toString(),
+        limit: paginationData.limit.toString()
+      });
+
+      // Add sorting parameters if available
+      if (sortConfig) {
+        queryParams.append('sortBy', sortConfig.key);
+        queryParams.append('sortOrder', sortConfig.direction);
+      }
+
+      // Add table filter if selected
+      if (selectedTable) {
+        queryParams.append('tableName', selectedTable);
+      }
+
+      // Add maker filter if selected
+      if (selectedMaker) {
+        queryParams.append('makerEmail', selectedMaker);
+      }
+
+      const response = await fetch(`${API_URL}/fetchrowrequest?${queryParams}`, {
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setRequests(data.data);
+        setPaginationData(data.pagination);
+      } else {
+        throw new Error(data.message || "Failed to fetch requests");
+      }
+    } catch (error: unknown) {
+      console.error("Failed to fetch requests:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to fetch requests",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update useEffect to handle pagination changes
+  useEffect(() => {
+    fetchRequests();
+  }, [paginationData.page, paginationData.limit, sortConfig, selectedTable, selectedMaker]);
+
+  // Update page size handler
+  const handlePageSizeChange = (newSize: number) => {
+    setPaginationData(prev => ({
+      ...prev,
+      limit: newSize,
+      page: 1 // Reset to first page when changing page size
+    }));
+  };
+
+  // Update page navigation handler
+  const handlePageChange = (newPage: number) => {
+    setPaginationData(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
   useEffect(() => {
     fetchRequests();
   }, []);
@@ -448,35 +539,6 @@ export default function RowRequestManager({
       setSelectedTable(uniqueTableNames[0]);
     }
   }, [requests]);
-
-  const fetchRequests = async () => {
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/fetchrowrequest`, {
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setRequests(data.data);
-      } else {
-        throw new Error(data.message || "Failed to fetch requests");
-      }
-    } catch (error: unknown) {
-      console.error("Failed to fetch requests:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to fetch requests",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAccept = async (requestId: string) => {
     setConfirmDialog({
@@ -762,12 +824,10 @@ export default function RowRequestManager({
   const getPaginatedData = () => {
     if (filteredRequests.length === 0) return [];
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
+    const startIndex = (currentPage - 1) * paginationData.limit;
+    const endIndex = startIndex + paginationData.limit;
     return filteredRequests.slice(startIndex, endIndex);
   };
-
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
 
   return (
     <div className="space-y-4">
@@ -1275,7 +1335,8 @@ export default function RowRequestManager({
         </TableBody>
       </Table>
 
-      {totalPages > 0 && (
+      {/* Updated Pagination UI */}
+      {paginationData.totalPages > 0 && (
         <div className="border-t border-[#e3f2fd] bg-white py-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1283,11 +1344,8 @@ export default function RowRequestManager({
                 Rows per page:
               </span>
               <select
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1); // Reset to first page when changing page size
-                }}
+                value={paginationData.limit}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                 className="h-8 px-2 rounded-lg border border-[#e3f2fd] text-sm text-[#1a237e] focus:outline-none focus:border-[#00bfa5]"
               >
                 <option value={10}>10</option>
@@ -1299,40 +1357,57 @@ export default function RowRequestManager({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
+                onClick={() => handlePageChange(paginationData.page - 1)}
+                disabled={paginationData.page === 1}
                 className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
 
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 rounded-md text-sm ${
-                        currentPage === page
-                          ? "bg-[#00bfa5] text-white"
-                          : "border border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
+                {Array.from({ length: paginationData.totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first page, last page, current page, and pages around current page
+                    const currentPage = paginationData.page;
+                    return (
+                      page === 1 ||
+                      page === paginationData.totalPages ||
+                      Math.abs(page - currentPage) <= 1
+                    );
+                  })
+                  .map((page, index, array) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && array[index - 1] !== page - 1 && (
+                        <span className="px-2">...</span>
+                      )}
+                      <button
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-1 rounded-md text-sm ${
+                          paginationData.page === page
+                            ? "bg-[#00bfa5] text-white"
+                            : "border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
               </div>
 
               <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
-                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(paginationData.page + 1)}
+                disabled={paginationData.page === paginationData.totalPages}
                 className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
+            </div>
+
+            <div className="text-sm text-[#1a237e]">
+              {`${(paginationData.page - 1) * paginationData.limit + 1}-${Math.min(
+                paginationData.page * paginationData.limit,
+                paginationData.total
+              )} of ${paginationData.total}`}
             </div>
           </div>
         </div>

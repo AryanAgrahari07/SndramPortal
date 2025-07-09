@@ -190,10 +190,11 @@ exports.finalizeBulkApprove = async (userId, socket) => {
           
           // Create placeholders for the SQL query
           const placeholders = columnNames.map((_, idx) => `$${idx + 1}`).join(', ');
-          
+          const quotedColumns = columnNames.map(col => `"${col}"`).join(", ");
+
           // Build the insert query
           const insertQuery = `
-            INSERT INTO app.${tableName} (${columnNames.join(', ')})
+            INSERT INTO app.${tableName} (${quotedColumns})
             VALUES (${placeholders});
           `;
           
