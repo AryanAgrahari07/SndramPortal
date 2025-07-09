@@ -97,12 +97,13 @@ exports.approve = async (req, res) => {
             });
         }
 
-        const updateColumns = updates.map(([column], index) => `${column} = $${index + 1}`).join(', ');
+        // Use double quotes around column names to preserve case
+        const updateColumns = updates.map(([column], index) => `"${column}" = $${index + 1}`).join(', ');
         const updateValues = updates.map(([, value]) => value);
         updateValues.push(row_id); // Add row_id for WHERE clause
 
-        // Use the SK column in the WHERE clause
-        const whereClause = `WHERE ${skColumnName} = $${updates.length + 1}`;
+        // Use the SK column in the WHERE clause with double quotes
+        const whereClause = `WHERE "${skColumnName}" = $${updates.length + 1}`;
 
         console.log('Update SQL:', `UPDATE app.${table_name} SET ${updateColumns} ${whereClause}`);
         console.log('Update values:', updateValues);
@@ -241,7 +242,10 @@ exports.approveAll = async (req, res) => {
                 const updates = Object.entries(new_data)
                     .filter(([column]) => column !== 'request_id' && column !== 'row_id')
                     .map(([column, value]) => {
-                        return [column, value];
+                        const processedValue = (value === 'null' || value === 'NULL' || value === '') 
+                            ? null 
+                            : value;
+                        return [column, processedValue];
                     });
 
                 if (updates.length === 0) {
@@ -249,12 +253,13 @@ exports.approveAll = async (req, res) => {
                     continue;
                 }
 
-                const updateColumns = updates.map(([column], index) => `${column} = $${index + 1}`).join(', ');
+                // Use double quotes around column names to preserve case
+                const updateColumns = updates.map(([column], index) => `"${column}" = $${index + 1}`).join(', ');
                 const updateValues = updates.map(([, value]) => value);
                 updateValues.push(row_id); // Add row_id for WHERE clause
 
-                // Use the SK column in the WHERE clause
-                const whereClause = `WHERE ${skColumnName} = $${updates.length + 1}`;
+                // Use the SK column in the WHERE clause with double quotes
+                const whereClause = `WHERE "${skColumnName}" = $${updates.length + 1}`;
 
                 const dynamicUpdateQuery = `
                     UPDATE app.${table_name}

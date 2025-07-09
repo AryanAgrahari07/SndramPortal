@@ -1,29 +1,46 @@
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { usePagination } from "../hooks/usePagination";
-//import { colors } from '../constants/colors'
+import { PageSizeSelector } from "./PageSizeSelector";
 
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
+  totalItems?: number;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
+  pageSize = 10,
+  onPageSizeChange,
+  totalItems = 0,
 }) => {
   const pageNumbers = usePagination({ currentPage, totalPages });
 
-  // if (totalPages <= 1) return null;
-  console.log({ currentPage, totalPages, onPageChange });
   return (
     <div className="flex items-center justify-between px-2">
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-[#1a237e]">
-          Page {currentPage} of {totalPages}
-        </span>
+      <div className="flex items-center gap-4">
+        {onPageSizeChange && (
+          <PageSizeSelector
+            pageSize={pageSize}
+            onPageSizeChange={onPageSizeChange}
+          />
+        )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[#1a237e]">
+            Page {currentPage} of {totalPages}
+          </span>
+          {totalItems > 0 && (
+            <span className="text-sm text-gray-500">
+              ({totalItems} {totalItems === 1 ? "item" : "items"})
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

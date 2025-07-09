@@ -11,6 +11,7 @@ interface ValidationError {
   row: number;
   column: string;
   message: string;
+  originalLineNumber?: number; // Add original line number tracking
 }
 
 interface ValidationRule {
@@ -394,11 +395,25 @@ export const validateFieldValue = (
   return "";
 };
 
+// Function to map chunk row indices to original file line numbers
+export const mapRowToOriginalLine = (
+  chunkIndex: number,
+  rowIndexInChunk: number,
+  chunkSize: number
+): number => {
+  // Add 2 because:
+  // 1. CSV header is line 1
+  // 2. Row indices are 0-based, but line numbers are 1-based
+  return chunkIndex * chunkSize + rowIndexInChunk + 2;
+};
+
 // Main function to validate CSV data
 export const validateCSVData = async (
   data: Record<string, any>[],
   columnTypes: ColumnType[],
-  tableName: string
+  tableName: string,
+  chunkIndex: number = 0,
+  chunkSize: number = 1000
 ): Promise<ValidationError[]> => {
   const errors: ValidationError[] = [];
   
@@ -407,16 +422,18 @@ export const validateCSVData = async (
 
   // Validate each row in the CSV
   data.forEach((row, index) => {
-    const rowNumber = index + 2; // Adding 2 because index starts at 0 and we skip header row
+    // Calculate original line number in the file (accounting for header row)
+    const originalLineNumber = mapRowToOriginalLine(chunkIndex, index, chunkSize);
 
     Object.entries(row).forEach(([column, value]) => {
       const columnType = columnTypes.find(ct => ct.column_name === column);
       
       if (!columnType) {
         errors.push({
-          row: rowNumber,
+          row: index + 2, // Adding 2 because index starts at 0 and we skip header row
           column,
           message: `Unknown column`,
+          originalLineNumber
         });
         return;
       }
@@ -433,9 +450,10 @@ export const validateCSVData = async (
       
       if (error) {
         errors.push({
-          row: rowNumber,
+          row: index + 2,
           column,
-          message: error
+          message: error,
+          originalLineNumber
         });
       }
     });

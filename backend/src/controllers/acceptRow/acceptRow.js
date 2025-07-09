@@ -47,12 +47,16 @@ exports.acceptRow = async (req, res) => {
     const { table_name, row_data } = rowResult.rows[0];
 
     // Insert the row into the actual table
+    // Preserve the original case of column names
     const columns = Object.keys(row_data);
     const insertValue = Object.values(row_data);
     const placeholders = insertValue.map((_, idx) => `$${idx + 1}`).join(", ");
 
+    // Use double quotes around column names to preserve case
+    const quotedColumns = columns.map(col => `"${col}"`).join(", ");
+
     const insertQuery = `
-                INSERT INTO app.${table_name} (${columns.join(", ")})
+                INSERT INTO app.${table_name} (${quotedColumns})
                 VALUES (${placeholders})
             `;
 

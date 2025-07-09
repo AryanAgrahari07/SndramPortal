@@ -6,16 +6,7 @@ exports.bulkUpdate = async (req, res) => {
   const maker = req.user.user_id;
 
   try {
-    await client_update.query('BEGIN');
-
-    const results = {
-      updates: [],
-      inserts: [],
-      skipped: [],
-      errors: [],
-    };
-
-    // Get primary key column
+    // Get primary key column before transaction to reduce transaction time
     const pkQuery = `
       SELECT kcu.column_name
       FROM information_schema.table_constraints tc
@@ -30,166 +21,192 @@ exports.bulkUpdate = async (req, res) => {
     const pkResult = await client_update.query(pkQuery, [tableName]);
     const primaryKeyColumn = pkResult.rows[0]?.column_name || `${tableName}_sk`;
 
-    for (const row of data) {
+    const results = {
+      updates: [],
+      inserts: [],
+      skipped: [],
+      errors: [],
+    };
+
+    // Process in batches to reduce memory usage
+    const BATCH_SIZE = 100;
+    const totalBatches = Math.ceil(data.length / BATCH_SIZE);
+
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIdx = batchIndex * BATCH_SIZE;
+      const endIdx = Math.min((batchIndex + 1) * BATCH_SIZE, data.length);
+      const batchData = data.slice(startIdx, endIdx);
+
+      await client_update.query('BEGIN');
+
       try {
-          // Check if row is empty or contains only primary key
-          const nonPrimaryKeyValues = Object.entries(row).filter(([key, value]) => {
-            return key !== primaryKeyColumn && 
-                   value !== null && 
-                   value !== undefined && 
-                   value !== '' &&
-                   value !== 'null' &&
-                   value !== 'NULL';
-          });
-  
-          // Skip if row is empty or has only primary key
-          if (nonPrimaryKeyValues.length === 0) {
-            results.skipped.push({
-              id: row[primaryKeyColumn] || 'unknown',
-              reason: 'Empty row or contains only primary key'
+        // Process each row in the current batch
+        for (const row of batchData) {
+          try {
+            // Check if row is empty or contains only primary key
+            const nonPrimaryKeyValues = Object.entries(row).filter(([key, value]) => {
+              return key !== primaryKeyColumn && 
+                    value !== null && 
+                    value !== undefined && 
+                    value !== '' &&
+                    value !== 'null' &&
+                    value !== 'NULL';
             });
-            continue;
-          }
-          
-        let existingRow = null;
-
-        // Check if row exists only if it has a primary key value
-        if (row[primaryKeyColumn]) {
-          const checkQuery = `
-            SELECT *
-            FROM app.${tableName}
-            WHERE ${primaryKeyColumn} = $1;
-          `;
-          
-          const exists = await client_update.query(checkQuery, [row[primaryKeyColumn]]);
-          existingRow = exists.rows[0];
-        }
-
-        if (existingRow) {
-          // Compare old and new values to find actual changes
-          const changes = {};
-          let hasChanges = false;
-
-          // Only check columns that are present in the CSV row
-          Object.keys(row).forEach(column => {
-            // Skip empty strings, null, or undefined values to preserve existing data
-            if (row[column] === '' || row[column] === null || row[column] === undefined) {
-              return;
+    
+            // Skip if row is empty or has only primary key
+            if (nonPrimaryKeyValues.length === 0) {
+              results.skipped.push({
+                id: row[primaryKeyColumn] || 'unknown',
+                reason: 'Empty row or contains only primary key'
+              });
+              continue;
             }
             
-            // Convert both values to strings for comparison
-            const oldValue = String(existingRow[column] || '');
-            const newValue = String(row[column]);
+            let existingRow = null;
 
-            // Only include if values are different
-            if ((oldValue !== newValue) && 
-                !(oldValue === null && (newValue === 'null' || newValue === 'NULL' || newValue === '')) && 
-                !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && newValue === null) &&
-                !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && 
-                  (newValue === 'null' || newValue === 'NULL' || newValue === ''))) {
-              changes[column] = row[column];
-              hasChanges = true;
+            // Check if row exists only if it has a primary key value
+            if (row[primaryKeyColumn]) {
+              const checkQuery = `
+                SELECT *
+                FROM app.${tableName}
+                WHERE ${primaryKeyColumn} = $1;
+              `;
+              
+              const exists = await client_update.query(checkQuery, [row[primaryKeyColumn]]);
+              existingRow = exists.rows[0];
             }
-          });
 
-          if (hasChanges) {
-            // Create new data by merging existing data with only the changed values
-            // This ensures we keep old values for fields not present in the update
-            const newData = { ...existingRow, ...changes };
-            const requestId = uuidv4();
+            if (existingRow) {
+              // Compare old and new values to find actual changes
+              const changes = {};
+              let hasChanges = false;
 
-            const trackerQuery = `
-              INSERT INTO app.change_tracker (
-                table_name, 
-                old_data, 
-                new_data, 
-                status, 
+              // Only check columns that are present in the CSV row
+              Object.keys(row).forEach(column => {
+                // Skip empty strings, null, or undefined values to preserve existing data
+                if (row[column] === '' || row[column] === null || row[column] === undefined) {
+                  return;
+                }
+                
+                // Convert both values to strings for comparison
+                const oldValue = String(existingRow[column] || '');
+                const newValue = String(row[column]);
+
+                // Only include if values are different
+                if ((oldValue !== newValue) && 
+                    !(oldValue === null && (newValue === 'null' || newValue === 'NULL' || newValue === '')) && 
+                    !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && newValue === null) &&
+                    !((oldValue === 'null' || oldValue === 'NULL' || oldValue === '') && 
+                      (newValue === 'null' || newValue === 'NULL' || newValue === ''))) {
+                  changes[column] = row[column];
+                  hasChanges = true;
+                }
+              });
+
+              if (hasChanges) {
+                // Create new data by merging existing data with only the changed values
+                // This ensures we keep old values for fields not present in the update
+                const newData = { ...existingRow, ...changes };
+                const requestId = uuidv4();
+
+                const trackerQuery = `
+                  INSERT INTO app.change_tracker (
+                    table_name, 
+                    old_data, 
+                    new_data, 
+                    status, 
+                    maker,
+                    request_id, 
+                    table_id, 
+                    row_id,
+                    created_at,
+                    updated_at,
+                    makerseen,
+                    checkerseen
+                  )
+                  VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, false, false)
+                  RETURNING *;
+                `;
+
+                await client_update.query(trackerQuery, [
+                  tableName,
+                  existingRow,
+                  newData,
+                  maker,
+                  requestId,
+                  tableName,
+                  row[primaryKeyColumn],
+                ]);
+
+                results.updates.push({
+                  id: row[primaryKeyColumn],
+                  status: 'pending_approval',
+                  request_id: requestId,
+                  changes: changes // Shows only what actually changed
+                });
+              } else {
+                // No changes detected for this row
+                results.skipped.push({
+                  id: row[primaryKeyColumn],
+                  reason: 'No changes detected'
+                });
+              }
+            } else {
+              // For new insertions, only include non-empty values
+              const cleanRow = Object.fromEntries(
+                Object.entries(row).filter(([key, value]) => 
+                  key !== primaryKeyColumn && 
+                  key !== `${tableName}_sk` && 
+                  value !== '' && 
+                  value !== null && 
+                  value !== undefined
+                )
+              );
+
+              const requestId = uuidv4();
+              
+              const addRowQuery = `
+                INSERT INTO app.add_row_table (
+                  table_name, 
+                  row_data, 
+                  status, 
+                  maker, 
+                  request_id,
+                  created_at,
+                  updated_at
+                )
+                VALUES ($1, $2, 'pending', $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING *;
+              `;
+
+              await client_update.query(addRowQuery, [
+                tableName,
+                cleanRow,
                 maker,
-                request_id, 
-                table_id, 
-                row_id,
-                created_at,
-                updated_at,
-                makerseen,
-                checkerseen
-              )
-              VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, false, false)
-              RETURNING *;
-            `;
+                requestId,
+              ]);
 
-            await client_update.query(trackerQuery, [
-              tableName,
-              existingRow,
-              newData,
-              maker,
-              requestId,
-              tableName,
-              row[primaryKeyColumn],
-            ]);
-
-            results.updates.push({
-              id: row[primaryKeyColumn],
-              status: 'pending_approval',
-              request_id: requestId,
-              changes: changes // Shows only what actually changed
-            });
-          } else {
-            // No changes detected for this row
-            results.skipped.push({
-              id: row[primaryKeyColumn],
-              reason: 'No changes detected'
+              results.inserts.push({
+                status: 'pending_approval',
+                request_id: requestId
+              });
+            }
+          } catch (error) {
+            console.error('Error processing row:', error);
+            results.errors.push({
+              data: row,
+              error: error.message,
             });
           }
-        } else {
-          // For new insertions, only include non-empty values
-          const cleanRow = Object.fromEntries(
-            Object.entries(row).filter(([key, value]) => 
-              key !== primaryKeyColumn && 
-              key !== `${tableName}_sk` && 
-              value !== '' && 
-              value !== null && 
-              value !== undefined
-            )
-          );
-
-          const requestId = uuidv4();
-          
-          const addRowQuery = `
-            INSERT INTO app.add_row_table (
-              table_name, 
-              row_data, 
-              status, 
-              maker, 
-              request_id,
-              created_at,
-              updated_at
-            )
-            VALUES ($1, $2, 'pending', $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            RETURNING *;
-          `;
-
-          await client_update.query(addRowQuery, [
-            tableName,
-            cleanRow,
-            maker,
-            requestId,
-          ]);
-
-          results.inserts.push({
-            status: 'pending_approval',
-            request_id: requestId
-          });
         }
-      } catch (error) {
-        console.error('Error processing row:', error);
-        results.errors.push({
-          data: row,
-          error: error.message,
-        });
+
+        await client_update.query('COMMIT');
+      } catch (batchError) {
+        await client_update.query('ROLLBACK');
+        console.error('Error in batch processing:', batchError);
+        throw batchError;
       }
     }
-
-    await client_update.query('COMMIT');
 
     return res.status(200).json({
       success: true,
@@ -207,7 +224,6 @@ exports.bulkUpdate = async (req, res) => {
     });
 
   } catch (error) {
-    await client_update.query('ROLLBACK');
     console.error('Error in bulk update:', error);
     return res.status(500).json({
       success: false,

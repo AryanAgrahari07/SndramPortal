@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -26,7 +26,9 @@ import {
   DialogTitle,
 } from "@/components/ui/Dialog";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { BulkOperationProgress } from "../BulkOperationProgress";
 import { API_URL } from "@/config/constants";
+import { io, Socket } from "socket.io-client";
 
 interface RowData {
   [key: string]: string | number | boolean | null | undefined;
@@ -210,6 +212,23 @@ export default function RowRequestManager({
     start: string;
     end: string;
   } | null>(null);
+  
+  // WebSocket state
+  const socketRef = useRef<Socket | null>(null);
+  const [bulkProgress, setBulkProgress] = useState({
+    isOpen: false,
+    operationType: "approve" as "approve" | "reject",
+    totalRequests: 0,
+    progress: 0,
+    status: "processing" as "processing" | "success" | "error" | "finalizing",
+    errorMessage: "",
+    summary: {
+      total: 0,
+      approved: 0,
+      rejected: 0,
+      failed: 0
+    }
+  });
 
   // function to filter by date range
   const filterByDateRange = (requests: any[]) => {
@@ -324,6 +343,103 @@ export default function RowRequestManager({
 
   useEffect(() => {
     fetchRequests();
+  }, []);
+  
+  // Initialize WebSocket connection
+  useEffect(() => {
+    // Create socket connection
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    
+    const socket = io(API_URL, {
+      auth: {
+        token
+      }
+    });
+    
+    socketRef.current = socket;
+    
+    // Set up event listeners for admin bulk approve
+    socket.on('admin-bulk-approve-chunk-processed', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        progress: data.processedRequests,
+        status: "processing"
+      }));
+    });
+    
+    socket.on('bulk-approve-processing', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        progress: data.processedRequests,
+        status: data.status === "finalizing" ? "finalizing" : "processing"
+      }));
+    });
+    
+    socket.on('admin-bulk-approve-finalized', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "success",
+        summary: {
+          total: data.summary.total,
+          approved: data.summary.approved,
+          rejected: 0,
+          failed: data.summary.failed
+        }
+      }));
+      fetchRequests(); // Refresh the list
+    });
+    
+    socket.on('admin-bulk-approve-error', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: data.error
+      }));
+    });
+    
+    // Set up event listeners for admin bulk reject
+    socket.on('admin-bulk-reject-chunk-processed', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        progress: data.processedRequests,
+        status: "processing"
+      }));
+    });
+    
+    socket.on('bulk-reject-processing', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        progress: data.processedRequests,
+        status: data.status === "finalizing" ? "finalizing" : "processing"
+      }));
+    });
+    
+    socket.on('admin-bulk-reject-finalized', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "success",
+        summary: {
+          total: data.summary.total,
+          approved: 0,
+          rejected: data.summary.rejected,
+          failed: data.summary.failed
+        }
+      }));
+      fetchRequests(); // Refresh the list
+    });
+    
+    socket.on('admin-bulk-reject-error', (data) => {
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: data.error
+      }));
+    });
+    
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   // Set initial selected table when requests are loaded
@@ -469,28 +585,69 @@ export default function RowRequestManager({
   const handleBulkAcceptConfirm = async () => {
     if (selectedRequests.length === 0) return;
     try {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/acceptallrow`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ request_ids: selectedRequests }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Requests approved successfully",
-        });
-        setSelectedRequests([]);
-        await fetchRequests();
-      } else {
-        throw new Error(data.message || "Failed to approve requests");
+      if (!socketRef.current || !socketRef.current.connected) {
+        throw new Error("WebSocket connection not available");
       }
+      
+      // Open progress modal
+      setBulkProgress({
+        isOpen: true,
+        operationType: "approve",
+        totalRequests: selectedRequests.length,
+        progress: 0,
+        status: "processing",
+        errorMessage: "",
+        summary: {
+          total: selectedRequests.length,
+          approved: 0,
+          rejected: 0,
+          failed: 0
+        }
+      });
+      
+      // Prepare data chunks (10 requests per chunk)
+      const chunkSize = 10;
+      const chunks = [];
+      for (let i = 0; i < selectedRequests.length; i += chunkSize) {
+        chunks.push(selectedRequests.slice(i, i + chunkSize));
+      }
+      
+      // Start bulk approve operation
+      socketRef.current.emit('admin-bulk-approve-start', {});
+      
+      // Send chunks
+      for (let i = 0; i < chunks.length; i++) {
+        socketRef.current.emit('admin-bulk-approve-chunk', {
+          chunk: chunks[i].map(requestId => ({ request_id: requestId })),
+          chunkIndex: i,
+          totalChunks: chunks.length
+        });
+        
+        // Wait for the server to process the chunk before sending the next one
+        await new Promise(resolve => {
+          const onChunkProcessed = (data: any) => {
+            if (data.chunkIndex === i) {
+              socketRef.current?.off('admin-bulk-approve-chunk-processed', onChunkProcessed);
+              resolve(data);
+            }
+          };
+          
+          socketRef.current?.on('admin-bulk-approve-chunk-processed', onChunkProcessed);
+          
+          // Add timeout to prevent hanging
+          setTimeout(() => {
+            socketRef.current?.off('admin-bulk-approve-chunk-processed', onChunkProcessed);
+            resolve(null);
+          }, 5000);
+        });
+      }
+      
+      // Complete the operation
+      socketRef.current.emit('admin-bulk-approve-complete', {});
+      
+      // Clear selected requests
+      setSelectedRequests([]);
+      
     } catch (error: unknown) {
       console.error("Failed to approve requests:", error);
       toast({
@@ -499,37 +656,85 @@ export default function RowRequestManager({
           error instanceof Error ? error.message : "Failed to approve requests",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "Unknown error occurred"
+      }));
     }
   };
 
   const handleBulkReject = async (comments: string) => {
     if (selectedRequests.length === 0) return;
     try {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/rejectallrow`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ request_ids: selectedRequests, comments }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Requests rejected successfully",
-        });
-        setSelectedRequests([]);
-        setRejectDialogOpen(false);
-        await fetchRequests();
-      } else {
-        throw new Error(data.message || "Failed to reject requests");
+      if (!socketRef.current || !socketRef.current.connected) {
+        throw new Error("WebSocket connection not available");
       }
+      
+      // Open progress modal
+      setBulkProgress({
+        isOpen: true,
+        operationType: "reject",
+        totalRequests: selectedRequests.length,
+        progress: 0,
+        status: "processing",
+        errorMessage: "",
+        summary: {
+          total: selectedRequests.length,
+          approved: 0,
+          rejected: 0,
+          failed: 0
+        }
+      });
+      
+      // Prepare data chunks (10 requests per chunk)
+      const chunkSize = 10;
+      const chunks = [];
+      for (let i = 0; i < selectedRequests.length; i += chunkSize) {
+        chunks.push(selectedRequests.slice(i, i + chunkSize));
+      }
+      
+      // Start bulk reject operation
+      socketRef.current.emit('admin-bulk-reject-start', {
+        comments: comments
+      });
+      
+      // Send chunks
+      for (let i = 0; i < chunks.length; i++) {
+        socketRef.current.emit('admin-bulk-reject-chunk', {
+          chunk: chunks[i].map(requestId => ({ request_id: requestId })),
+          chunkIndex: i,
+          totalChunks: chunks.length,
+          comments: comments
+        });
+        
+        // Wait for the server to process the chunk before sending the next one
+        await new Promise(resolve => {
+          const onChunkProcessed = (data: any) => {
+            if (data.chunkIndex === i) {
+              socketRef.current?.off('admin-bulk-reject-chunk-processed', onChunkProcessed);
+              resolve(data);
+            }
+          };
+          
+          socketRef.current?.on('admin-bulk-reject-chunk-processed', onChunkProcessed);
+          
+          // Add timeout to prevent hanging
+          setTimeout(() => {
+            socketRef.current?.off('admin-bulk-reject-chunk-processed', onChunkProcessed);
+            resolve(null);
+          }, 5000);
+        });
+      }
+      
+      // Complete the operation
+      socketRef.current.emit('admin-bulk-reject-complete', {});
+      
+      // Clean up
+      setSelectedRequests([]);
+      setRejectDialogOpen(false);
+      
     } catch (error: unknown) {
       console.error("Failed to reject requests:", error);
       toast({
@@ -538,8 +743,12 @@ export default function RowRequestManager({
           error instanceof Error ? error.message : "Failed to reject requests",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      
+      setBulkProgress(prev => ({
+        ...prev,
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "Unknown error occurred"
+      }));
     }
   };
 
@@ -1248,6 +1457,17 @@ export default function RowRequestManager({
             : "Are you sure you want to approve this request?"
         }
         variant="success"
+      />
+      
+      <BulkOperationProgress
+        isOpen={bulkProgress.isOpen}
+        onClose={() => setBulkProgress(prev => ({ ...prev, isOpen: false }))}
+        operationType={bulkProgress.operationType}
+        totalRequests={bulkProgress.totalRequests}
+        progress={bulkProgress.progress}
+        status={bulkProgress.status}
+        errorMessage={bulkProgress.errorMessage}
+        summary={bulkProgress.summary}
       />
     </div>
   );

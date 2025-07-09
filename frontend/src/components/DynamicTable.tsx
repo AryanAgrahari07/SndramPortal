@@ -21,11 +21,14 @@ import { validateCSVData } from "../utils/csvValidation";
 import { API_URL } from "@/config/constants";
 import { sanitizeInput } from "@/utils/security";
 import { preventXSS } from "@/utils/security";
+import CSVUploadProgress from "./CSVUploadProgress";
+import { io, Socket } from "socket.io-client";
 
 interface CSVValidationError {
   row: number;
   column: string;
   message: string;
+  originalLineNumber?: number; // Add original line number tracking
 }
 
 interface ColumnStatus {
@@ -86,6 +89,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [csvErrors, setCSVErrors] = useState<CSVValidationError[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUploadProgress, setShowUploadProgress] = useState(false);
 
   // Add ref for search input
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -113,18 +117,72 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     error: permissionsError,
   } = useColumnPermissions(tableName);
 
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
+  // Update the uploadProgress state interface to include database processing fields
+  const [uploadProgress, setUploadProgress] = useState({
+    status: 'idle' as 'idle' | 'validating' | 'uploading' | 'processing_database' | 'finalizing' | 'completed' | 'failed',
+    totalRows: 0,
+    processedRows: 0,
+    currentChunk: 0,
+    totalChunks: 0,
+    dbProcessedRows: 0,
+    dbTotalRows: 0,
+    errors: [] as CSVValidationError[]
+  });
+
+  console.log(uploadProgress);
+  // Check for ongoing uploads on component mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('csvUploadState');
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        if (parsedState.tableName === tableName) {
+          setShowUploadProgress(true);
+        }
+      } catch (error) {
+        console.error('Error parsing saved upload state:', error);
+      }
+    }
+  }, [tableName]);
+
+  // Initialize socket connection when component mounts
+  useEffect(() => {
+    // Only create socket when needed
+    return () => {
+      // Clean up socket connection on unmount if it exists
+      if (socketInstance) {
+        socketInstance.disconnect();
+      }
+    };
+  }, [socketInstance]);
+
+  // Fetching dropdown columns when table name changes
+  useEffect(() => {
+    fetchDropdownData();
+  }, [tableName]);
+
+  useEffect(() => {
+    if (tableName) {
+      fetchHighlightedCells(tableName)
+        .then((highlights) => setHighlightedCells(highlights))
+        .catch(console.error);
+    }
+  }, [tableName]);
+
+  useEffect(() => {
+    console.log("FilterParams updated:", filterParams);
+  }, [filterParams]);
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInput(e.target.value);
   };
-
-  
 
   const getDisplayName = (columnName: string) => {
     if (!renamedColumns) return columnName;
     const mapping = renamedColumns.find(m => m.originalName === columnName);
     return mapping?.displayName || columnName;
   };
-
 
   // search button handler
   const handleSearchClick = () => {
@@ -249,23 +307,6 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     [onPageSizeChange]
   );
 
-  useEffect(() => {
-    console.log("FilterParams updated:", filterParams);
-  }, [filterParams]);
-
-  // Fetching dropdown columns when table name changes
-  useEffect(() => {
-    fetchDropdownData();
-  }, [tableName]);
-
-  useEffect(() => {
-    if (tableName) {
-      fetchHighlightedCells(tableName)
-        .then((highlights) => setHighlightedCells(highlights))
-        .catch(console.error);
-    }
-  }, [tableName]);
-
   const fetchDropdownData = async () => {
     try {
       setIsLoadingDropdowns(true);
@@ -387,23 +428,28 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     );
   };
 
-  if (isDataLoading || isPermissionsLoading || isLoadingDropdowns) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00bfa5]"></div>
-      </div>
-    );
-  }
+  // Function to update upload progress state
+  const updateUploadProgress = (updates: Partial<any>) => {
+    const currentState = localStorage.getItem('csvUploadState');
+    let state = currentState ? JSON.parse(currentState) : null;
+    
+    const newState = {
+      ...(state || {}),
+      ...updates,
+      lastUpdated: Date.now()
+    };
+    
+    localStorage.setItem('csvUploadState', JSON.stringify(newState));
+    
+    // Dispatch a custom event to notify other tabs
+    const event = new StorageEvent('storage', {
+      key: 'csvUploadState',
+      newValue: JSON.stringify(newState)
+    });
+    window.dispatchEvent(event);
+  };
 
-  if (dataError || permissionsError) {
-    return (
-      <div className="text-red-600 p-4 text-center bg-red-50 rounded-lg">
-        {dataError || permissionsError}
-      </div>
-    );
-  }
-
-  // CSV upload handler
+  // Modified CSV upload handler with WebSocket processing
   const handleCSVUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -413,12 +459,20 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     setIsUploading(true);
     setCSVErrors([]);
     setShowErrors(true);
+    setShowUploadProgress(true);
 
     try {
       // Validate file type and size
       if (!file.type && !file.name.endsWith(".csv")) {
         throw new Error("Please upload a valid CSV file");
       }
+
+      // Show file size info
+      const fileSizeMB = file.size / (1024 * 1024);
+      toast({
+        title: "Processing File",
+        description: `File size: ${fileSizeMB.toFixed(2)} MB`,
+      });
 
       // Parse CSV file
       const results = await new Promise<Papa.ParseResult<Record<string, any>>>(
@@ -432,6 +486,32 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
           });
         }
       );
+
+      // Initialize upload progress
+      setUploadProgress({
+        status: 'validating',
+        totalRows: results.data.length,
+        processedRows: 0,
+        currentChunk: 0,
+        totalChunks: 0,
+        dbProcessedRows: 0,
+        dbTotalRows: 0,
+        errors: []
+      });
+
+      // Update local storage for cross-tab state
+      updateUploadProgress({
+        tableName,
+        fileName: file.name,
+        totalRows: results.data.length,
+        processedRows: 0,
+        currentChunk: 0,
+        totalChunks: 0,
+        status: 'validating',
+        errors: [],
+        startTime: Date.now(),
+        lastUpdated: Date.now()
+      });
 
       // Validate headers match table columns
       const csvHeaders = Object.keys(results.data[0] || {}).map((header) =>
@@ -452,65 +532,359 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         character_maximum_length: null,
       }));
 
-      // Validate CSV data with the new async approach that fetches validation rules from backend
-      const validationErrors = await validateCSVData(results.data, columnTypes, tableName);
+      // Perform initial client-side validation on a sample of the data
+      const SAMPLE_SIZE = Math.min(100, results.data.length);
+      const sampleData = results.data.slice(0, SAMPLE_SIZE);
+      const sampleErrors = await validateCSVData(sampleData, columnTypes, tableName, 0, SAMPLE_SIZE);
 
-      if (validationErrors.length > 0) {
-        setCSVErrors(validationErrors);
+      if (sampleErrors.length > 0) {
+        setCSVErrors(sampleErrors);
+        setUploadProgress(prev => ({
+          ...prev,
+          status: 'failed',
+          errors: sampleErrors
+        }));
+        updateUploadProgress({
+          status: 'failed',
+          errors: sampleErrors
+        });
+        toast({
+          title: "Validation Failed",
+          description: `Found ${sampleErrors.length} errors in the first ${SAMPLE_SIZE} rows. Please fix them and try again.`,
+          variant: "destructive",
+        });
         setIsUploading(false);
-        return; // Stop here if there are validation errors
+        return;
       }
 
-      // Sanitize data before sending to backend
-      const sanitizedData = results.data.map((row) => {
-        const sanitizedRow: Record<string, any> = {};
-        Object.entries(row).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== "") {
-            sanitizedRow[key] = preventXSS(sanitizeInput(String(value)));
+      // Initialize Socket.IO connection for large file processing
+      const socket = io(API_URL, {
+        withCredentials: true,
+        transports: ['websocket'],
+        auth: {
+          token: localStorage.getItem("token")
+        }
+      });
+      
+      setSocketInstance(socket);
+
+      // Set up socket event handlers
+      socket.on('connect', () => {
+        console.log('Socket connected for CSV upload');
+        
+        // Process data in chunks to avoid memory issues
+        const CHUNK_SIZE = 1000;
+        const totalChunks = Math.ceil(results.data.length / CHUNK_SIZE);
+        
+        // Update progress state
+        setUploadProgress(prev => ({
+          ...prev,
+          status: 'uploading',
+          totalChunks
+        }));
+        
+        updateUploadProgress({
+          status: 'uploading',
+          totalChunks
+        });
+        
+        // Start upload process
+        socket.emit('csv-upload-start', {
+          tableName,
+          totalRows: results.data.length,
+          totalChunks
+        });
+        
+        // Send chunks sequentially
+        const sendChunk = (chunkIndex: number) => {
+          if (chunkIndex >= totalChunks) {
+            // All chunks sent, finalize the upload
+            socket.emit('csv-upload-complete', {
+              tableName
+            });
+            return;
+          }
+          
+          const startIdx = chunkIndex * CHUNK_SIZE;
+          const endIdx = Math.min((chunkIndex + 1) * CHUNK_SIZE, results.data.length);
+          const chunk = results.data.slice(startIdx, endIdx);
+          
+          // Sanitize data before sending
+          const sanitizedChunk = chunk.map((row) => {
+            const sanitizedRow: Record<string, any> = {};
+            Object.entries(row).forEach(([key, value]) => {
+              if (value !== null && value !== undefined && value !== "") {
+                sanitizedRow[key] = preventXSS(sanitizeInput(String(value)));
+              }
+            });
+            return sanitizedRow;
+          });
+          
+          // Send chunk to server
+          socket.emit('csv-data-chunk', {
+            chunk: sanitizedChunk,
+            tableName,
+            chunkIndex,
+            totalChunks
+          });
+        };
+        
+        // Start with the first chunk
+        sendChunk(0);
+        
+        // Update the csv-chunk-processed event handler to properly handle errors
+        socket.on('csv-chunk-processed', (data: {
+          chunkIndex: number;
+          totalChunks: number;
+          processed: number;
+          errors: Array<{
+            data?: Record<string, any>;
+            errors?: Record<string, string>;
+          }>;
+          errorCount: number;
+        }) => {
+          // Update progress
+          setUploadProgress(prev => ({
+            ...prev,
+            currentChunk: data.chunkIndex + 1,
+            processedRows: prev.processedRows + data.processed,
+            errors: [...prev.errors, ...(Array.isArray(data.errors) ? data.errors.map(error => {
+              // Handle both error formats
+              if (error.errors && typeof error.errors === 'object') {
+                const errorKey = Object.keys(error.errors)[0] || '';
+                const errorMessage = Object.values(error.errors)[0] || 'Validation error';
+                return {
+                  row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+                  column: errorKey,
+                  message: errorMessage
+                };
+              } else {
+                return {
+                  row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+                  column: '',
+                  message: 'Validation error'
+                };
+              }
+            }) : [])]
+          }));
+          
+          updateUploadProgress({
+            currentChunk: data.chunkIndex + 1,
+            processedRows: (data.chunkIndex * CHUNK_SIZE) + data.processed,
+            errorCount: data.errorCount || 0,
+            errors: Array.isArray(data.errors) ? data.errors.slice(0, 10).map(error => {
+              // Handle both error formats
+              if (error.errors && typeof error.errors === 'object') {
+                const errorKey = Object.keys(error.errors)[0] || '';
+                const errorMessage = Object.values(error.errors)[0] || 'Validation error';
+                return {
+                  row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+                  column: errorKey,
+                  message: errorMessage
+                };
+              } else {
+                return {
+                  row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+                  column: '',
+                  message: 'Validation error'
+                };
+              }
+            }) : []
+          });
+          
+          // Always send next chunk to collect all errors
+          sendChunk(data.chunkIndex + 1);
+        });
+        
+        // Handle upload finalization
+        socket.on('csv-upload-finalized', (data) => {
+          setUploadProgress(prev => ({
+            ...prev,
+            status: 'completed'
+          }));
+          
+          updateUploadProgress({
+            status: 'completed'
+          });
+          
+          toast({
+            title: "Success",
+            description: `Processed ${data.summary.updates} updates and ${data.summary.inserts} new entries`,
+          });
+          
+          // Refresh table data
+          refreshData();
+          
+          // Clean up socket connection
+          socket.disconnect();
+          setSocketInstance(null);
+          setIsUploading(false);
+        });
+        
+        // Handle errors
+        socket.on('csv-upload-error', (error) => {
+          console.error('CSV upload error:', error);
+          
+          setUploadProgress(prev => ({
+            ...prev,
+            status: 'failed',
+            errors: [...prev.errors, { 
+              row: 0, 
+              column: '', 
+              message: error.error || "Unknown error occurred" 
+            }]
+          }));
+          
+          updateUploadProgress({
+            status: 'failed',
+            errors: [{ 
+              row: 0, 
+              column: '', 
+              message: error.error || "Unknown error occurred" 
+            }]
+          });
+          
+          toast({
+            title: "Error",
+            description: error.error || "Failed to process CSV file",
+            variant: "destructive",
+          });
+          
+          // Clean up socket connection
+          socket.disconnect();
+          setSocketInstance(null);
+          setIsUploading(false);
+        });
+
+      });
+      
+      // Handle connection errors
+      socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        toast({
+          title: "Connection Error",
+          description: "Failed to establish WebSocket connection. Please try again.",
+          variant: "destructive",
+        });
+        
+        setUploadProgress(prev => ({
+          ...prev,
+          status: 'failed',
+          errors: [...prev.errors, { 
+            row: 0, 
+            column: '', 
+            message: "Connection error: " + error.message 
+          }]
+        }));
+        
+        updateUploadProgress({
+          status: 'failed',
+          errors: [{ 
+            row: 0, 
+            column: '', 
+            message: "Connection error: " + error.message 
+          }]
+        });
+        
+        socket.disconnect();
+        setSocketInstance(null);
+        setIsUploading(false);
+      });
+
+      // Add the handler for database processing updates in the socket connection section
+      socket.on('csv-db-processing', (data) => {
+        console.log('Database processing update:', data);
+        
+        setUploadProgress(prev => ({
+          ...prev,
+          status: data.status,
+          dbProcessedRows: data.processedRows,
+          dbTotalRows: data.totalRows
+        }));
+        
+        updateUploadProgress({
+          status: data.status,
+          dbProcessedRows: data.processedRows,
+          dbTotalRows: data.totalRows,
+          message: data.message
+        });
+      });
+
+      // Add handler for validation failures
+      socket.on('csv-validation-failed', (data: {
+        status: string;
+        message: string;
+        totalErrors: number;
+        errors: Array<{
+          data?: Record<string, any>;
+          errors?: Record<string, string>;
+        }>;
+      }) => {
+        console.log('CSV validation failed:', data);
+        
+        // Extract validation errors
+        const validationErrors = data.errors.map(error => {
+          // Handle both error formats
+          if (error.errors && typeof error.errors === 'object') {
+            const errorKey = Object.keys(error.errors)[0] || '';
+            const errorMessage = Object.values(error.errors)[0] || 'Validation error';
+            return {
+              row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+              column: errorKey,
+              message: errorMessage
+            };
+          } else {
+            return {
+              row: error.data ? (error.data[Object.keys(error.data)[0]] || 0) : 0,
+              column: '',
+              message: 'Validation error'
+            };
           }
         });
-        return sanitizedRow;
+        
+        setCSVErrors(validationErrors);
+        
+        setUploadProgress(prev => ({
+          ...prev,
+          status: 'failed',
+          errors: validationErrors
+        }));
+        
+        updateUploadProgress({
+          status: 'failed',
+          errors: validationErrors.slice(0, 100)
+        });
+        
+        toast({
+          title: "Validation Failed",
+          description: `Found ${data.totalErrors} errors in the CSV file. Please fix them and try again.`,
+          variant: "destructive",
+        });
+        
+        // Clean up socket connection
+        socket.disconnect();
+        setSocketInstance(null);
+        setIsUploading(false);
       });
 
-      // Send validated data to backend
-      const uploadResponse = await fetch(`${API_URL}/bulk-update`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          tableName,
-          data: sanitizedData,
-        }),
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to process CSV file");
-      }
-
-      const result = await uploadResponse.json();
-
-      console.log(result);
-      // Show success message
-      toast({
-        title: "Success",
-        description: `Processed ${result.results.updates.length} updates and ${result.results.inserts.length} new entries`,
-      });
-
-      // Refresh table data
-      refreshData();
     } catch (error) {
       console.error("CSV upload error:", error);
+      updateUploadProgress({
+        status: 'failed',
+        errors: [{
+          row: 0,
+          column: '',
+          message: error instanceof Error ? error.message : "Failed to process CSV file"
+        }]
+      });
       toast({
         title: "Error",
         description:
           error instanceof Error ? error.message : "Failed to process CSV file",
         variant: "destructive",
       });
-    } finally {
       setIsUploading(false);
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -529,6 +903,22 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
     link.click();
     URL.revokeObjectURL(link.href);
   };
+
+  if (isDataLoading || isPermissionsLoading || isLoadingDropdowns) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00bfa5]"></div>
+      </div>
+    );
+  }
+
+  if (dataError || permissionsError) {
+    return (
+      <div className="text-red-600 p-4 text-center bg-red-50 rounded-lg">
+        {dataError || permissionsError}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-200px)]">
@@ -689,8 +1079,8 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
                       key={index}
                       className="text-sm text-red-600 flex items-start gap-2"
                     >
-                      <span className="min-w-[4rem] font-medium">
-                        Row {error.row}:
+                      <span className="min-w-[6rem] font-medium">
+                        {error.originalLineNumber ? `Line ${error.originalLineNumber}:` : `Row ${error.row}:`}
                       </span>
                       <span className="font-medium">{error.column}</span>
                       <span className="text-red-500">- {error.message}</span>
@@ -1007,6 +1397,13 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
         dropdownColumns={dropdownColumns}
         dataTypes={dataTypes}
       />
+
+      {/* CSV Upload Progress */}
+      {showUploadProgress && (
+        <CSVUploadProgress 
+          onClose={() => setShowUploadProgress(false)}
+        />
+      )}
     </div>
   );
 };

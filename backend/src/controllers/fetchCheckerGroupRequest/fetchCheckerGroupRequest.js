@@ -9,6 +9,13 @@ const {
  */
 const fetchCheckerGroupRequest = async (req, res) => {
   try {
+    // For the group request, we always return summary data
+    // since we're already grouping by table name
+    // Extract pagination parameters from query string only if not summary
+    const summary = req.query.summary === 'true';
+    const page = summary ? 1 : (parseInt(req.query.page) || 1);
+    const limit = summary ? 1000 : (parseInt(req.query.limit) || 10); // Use high limit for summary
+    
     // Get all groups with their tables
     const groupQuery = `
       SELECT group_name, table_list::json as table_list
@@ -54,11 +61,51 @@ const fetchCheckerGroupRequest = async (req, res) => {
       return acc;
     }, {});
 
-    res.status(200).json({
-      success: true,
-      message: "Successfully fetched grouped checker requests",
-      data: groupedData,
-    });
+    // Calculate total number of groups with pending tables
+    const totalItems = Object.keys(groupedData).length;
+    
+    // For summary, return all data
+    // For paginated requests, apply pagination
+    let responseData = groupedData;
+    
+    if (!summary) {
+      const totalPages = Math.ceil(totalItems / limit);
+      
+      // Apply pagination to the grouped data
+      const paginatedGroupedData = {};
+      const groupNames = Object.keys(groupedData);
+      const startIndex = (page - 1) * limit;
+      const endIndex = Math.min(startIndex + limit, groupNames.length);
+      
+      for (let i = startIndex; i < endIndex; i++) {
+        const groupName = groupNames[i];
+        paginatedGroupedData[groupName] = groupedData[groupName];
+      }
+      
+      responseData = paginatedGroupedData;
+      
+      res.status(200).json({
+        success: true,
+        message: "Successfully fetched grouped checker requests",
+        data: responseData,
+        pagination: {
+          total: totalItems,
+          page: page,
+          limit: limit,
+          totalPages: totalPages
+        }
+      });
+    } else {
+      // For summary, just return all data with total count
+      res.status(200).json({
+        success: true,
+        message: "Successfully fetched grouped checker requests summary",
+        data: responseData,
+        pagination: {
+          total: totalItems
+        }
+      });
+    }
   } catch (error) {
     console.error("Error fetching checker group requests:", error);
     res.status(500).json({
