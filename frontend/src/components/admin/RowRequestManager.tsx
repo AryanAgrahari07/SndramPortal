@@ -442,7 +442,8 @@ export default function RowRequestManager({
     const token = localStorage.getItem("token");
     if (!token) return;
     
-    const socket = io(API_URL, {
+    const socket = io(API_URL.startsWith('/') ? window.location.origin : API_URL, {
+      path: API_URL.startsWith('/') ? `${API_URL}/socket.io` : undefined,
       auth: {
         token
       }
