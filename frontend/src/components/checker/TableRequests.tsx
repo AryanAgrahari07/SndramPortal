@@ -252,7 +252,8 @@ export const TableRequests = () => {
     }
     
     // Connect to WebSocket server with auth token
-    const socket = io(`${API_URL}`, {
+    const socket = io(API_URL.startsWith('/') ? window.location.origin : API_URL, {
+      path: API_URL.startsWith('/') ? `${API_URL}/socket.io` : undefined,
       auth: {
         token
       }
