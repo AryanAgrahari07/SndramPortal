@@ -559,6 +559,7 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({
 
       // Initialize Socket.IO connection for large file processing
       const socket = io(API_URL, {
+        path: '/socket.io/',
         withCredentials: true,
         transports: ['websocket'],
         auth: {

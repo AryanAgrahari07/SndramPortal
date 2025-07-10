@@ -14,11 +14,11 @@ pool: agent
 
 variables:
   ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
-    port: 5002
-    env: prd
+    port: 5000
+    env: dev
   ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/uat') }}:
-    port: 5001
-    env: uat
+    port: 5000
+    env: dev
   ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/feature/') }}:
     port: 5000
     env: dev
@@ -33,7 +33,7 @@ jobs:
       - bash: |
           #!/bin/bash
           set -e
-          mkdir -p /opt/app/{dev,uat/prd}
+          mkdir -p /opt/app/${env}
         displayName: Create Directory
       - bash: |
           #!/bin/bash
